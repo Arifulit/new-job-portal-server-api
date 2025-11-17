@@ -1,6 +1,6 @@
 export interface UpdateCandidateProfileDTO {
-  firstName?: string;
-  lastName?: string;
+  
+  name?: string;
   phone?: string;
   address?: string;
   skills?: string[];

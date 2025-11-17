@@ -2,8 +2,7 @@ import { Schema, model, Types } from "mongoose";
 
 export interface ICandidateProfile {
   user: Types.ObjectId;
-  firstName: string;
-  lastName: string;
+  name:string;
   phone: string;
   address?: string;
   skills?: string[];
@@ -12,8 +11,7 @@ export interface ICandidateProfile {
 
 const candidateProfileSchema = new Schema<ICandidateProfile>({
   user: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
-  firstName: { type: String, required: true },
-  lastName: { type: String, required: true },
+  name: { type: String, required: true },
   phone: { type: String, required: true },
   address: { type: String },
   skills: [{ type: String }],

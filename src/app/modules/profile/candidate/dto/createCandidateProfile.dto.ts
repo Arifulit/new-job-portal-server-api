@@ -1,7 +1,6 @@
 export interface CreateCandidateProfileDTO {
   user: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   phone: string;
   address?: string;
   skills?: string[];

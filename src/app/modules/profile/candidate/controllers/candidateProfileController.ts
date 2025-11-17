@@ -69,10 +69,12 @@ export const updateCandidateProfileController = async (req: Request, res: Respon
     console.log("🟦 UserId param:", req.params.userId);
     console.log("🟦 Update data:", req.body);
     
-    const profile = await candidateProfileService.updateCandidateProfile(
-      req.params.userId, 
+    await candidateProfileService.updateCandidateProfile(
+      req.params.userId,
       req.body
     );
+    
+    const profile = (await candidateProfileService.getCandidateProfile(req.params.userId)) as any;
     
     if (!profile) {
       console.log("⚠️ Controller: Profile not found for update");

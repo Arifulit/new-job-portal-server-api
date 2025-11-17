@@ -1,545 +1,92 @@
 {
   "info": {
-    "name": "Career-Code - Node/Express/MongoDB (Full Collection)",
-    "description": "Postman collection for Career-Code backend (Auth, Profiles, Jobs, Applications, Admin, Notifications, Audit, Analytics). Designed for Node.js + Express + MongoDB backend.",
+    "_postman_id": "b1a23d4f-5678-90ab-cdef-1234567890ab",
+    "name": "JobPortal Auth",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "variable": [
-    { "key": "base_url", "value": "http://localhost:5000", "type": "string" },
-    { "key": "token", "value": "", "type": "string" },
-    { "key": "refreshToken", "value": "", "type": "string" },
-    { "key": "userId", "value": "", "type": "string" },
-    { "key": "companyId", "value": "", "type": "string" },
-    { "key": "jobId", "value": "", "type": "string" },
-    { "key": "applicationId", "value": "", "type": "string" },
-    { "key": "offerId", "value": "", "type": "string" }
-  ],
   "item": [
     {
-      "name": "Auth",
-      "item": [
-        {
-          "name": "Register (Candidate/Recruiter/Admin)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123\",\n  \"role\": \"candidate\"\n}"
-            },
-            "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api","v1","auth","register"] }
-          },
-          "response": []
+      "name": "Register Candidate",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123\",\n  \"role\": \"candidate\"\n}"
         },
-        {
-          "name": "Login",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123\"\n}"
-            },
-            "url": { "raw": "{{base_url}}/api/v1/auth/login", "host": ["{{base_url}}"], "path": ["api","v1","auth","login"] }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var json = pm.response.json();",
-                  "if (json.token) {",
-                  "  pm.collectionVariables.set('token', json.token);",
-                  "}",
-                  "if (json.refreshToken) {",
-                  "  pm.collectionVariables.set('refreshToken', json.refreshToken);",
-                  "}",
-                  "if (json.user && json.user.id) {",
-                  "  pm.collectionVariables.set('userId', json.user.id);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "Refresh Token",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" },
-            "url": { "raw": "{{base_url}}/api/v1/auth/refresh", "host": ["{{base_url}}"], "path": ["api","v1","auth","refresh"] }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var json = pm.response.json();",
-                  "if (json.token) { pm.collectionVariables.set('token', json.token); }",
-                  "if (json.refreshToken) { pm.collectionVariables.set('refreshToken', json.refreshToken); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "Logout (invalidate refresh token)",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "body": { "mode": "raw", "raw": "{}" },
-            "url": { "raw": "{{base_url}}/api/v1/auth/logout", "host": ["{{base_url}}"], "path": ["api","v1","auth","logout"] }
-          },
-          "response": []
-        }
-      ]
+        "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api","v1","auth","register"] }
+      }
     },
-
     {
-      "name": "Profiles",
-      "item": [
-        {
-          "name": "Get Candidate Profile",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/profile/candidate", "host": ["{{base_url}}"], "path": ["api","v1","profile","candidate"] }
-          }
+      "name": "Register Employer",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Acme Corp\",\n  \"email\": \"employer@example.com\",\n  \"password\": \"Password123\",\n  \"role\": \"employer\"\n}"
         },
-        {
-          "name": "Update Candidate Profile",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fullName\": \"John Doe\",\n  \"phone\": \"01712345678\",\n  \"skills\": [\"Node.js\",\"MongoDB\"],\n  \"portfolio\": \"https://example.com\"\n}"
-            },
-            "url": { "raw": "{{base_url}}/api/v1/profile/candidate", "host": ["{{base_url}}"], "path": ["api","v1","profile","candidate"] }
-          }
-        },
-        {
-          "name": "Upload Resume (form-data)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "body": { "mode": "formdata", "formdata": [ { "key": "resume", "type": "file", "src": "" } ] },
-            "url": { "raw": "{{base_url}}/api/v1/profile/candidate/resume", "host": ["{{base_url}}"], "path": ["api","v1","profile","candidate","resume"] }
-          }
-        },
-
-        {
-          "name": "Get Employer Profile",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/profile/employer", "host": ["{{base_url}}"], "path": ["api","v1","profile","employer"] }
-          }
-        },
-        {
-          "name": "Update Employer Profile",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"companyName\": \"ABC Ltd\",\n  \"address\": \"Dhaka, Bangladesh\",\n  \"website\": \"https://abc.example\"\n}"
-            },
-            "url": { "raw": "{{base_url}}/api/v1/profile/employer", "host": ["{{base_url}}"], "path": ["api","v1","profile","employer"] }
-          }
-        },
-
-        {
-          "name": "Get Recruiter Profile",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/profile/recruiter", "host": ["{{base_url}}"], "path": ["api","v1","profile","recruiter"] }
-          }
-        },
-        {
-          "name": "Update Recruiter Profile",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"agencyName\": \"XYZ Recruitment\",\n  \"phone\": \"01712345678\"\n}"
-            },
-            "url": { "raw": "{{base_url}}/api/v1/profile/recruiter", "host": ["{{base_url}}"], "path": ["api","v1","profile","recruiter"] }
-          }
-        }
-      ]
+        "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api","v1","auth","register"] }
+      }
     },
-
     {
-      "name": "Jobs",
-      "item": [
-        {
-          "name": "Create Job (Recruiter/Admin)",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Backend Engineer\",\n  \"description\": \"We need Node.js developer\",\n  \"location\": \"Dhaka\",\n  \"salaryMin\": 30000,\n  \"salaryMax\": 80000,\n  \"visibility\": \"public\",\n  \"tags\": [\"node\",\"backend\",\"remote\"]\n}"
-            },
-            "url": { "raw": "{{base_url}}/api/v1/jobs", "host": ["{{base_url}}"], "path": ["api","v1","jobs"] }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var json = pm.response.json();",
-                  "if (json._id) { pm.collectionVariables.set('jobId', json._id); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
+      "name": "Register Recruiter",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Recruiter One\",\n  \"email\": \"recruiter@example.com\",\n  \"password\": \"Password123\",\n  \"role\": \"recruiter\"\n}"
         },
-        {
-          "name": "Update Job",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"published\",\n  \"description\": \"Updated description\"\n}"
-            },
-            "url": { "raw": "{{base_url}}/api/v1/jobs/{{jobId}}", "host": ["{{base_url}}"], "path": ["api","v1","jobs","{{jobId}}"] }
-          }
-        },
-        {
-          "name": "Get Job",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": { "raw": "{{base_url}}/api/v1/jobs/{{jobId}}", "host": ["{{base_url}}"], "path": ["api","v1","jobs","{{jobId}}"] }
-          }
-        },
-        {
-          "name": "Search Jobs",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": { "raw": "{{base_url}}/api/v1/jobs?q=node&location=Dhaka&page=1&limit=20", "host": ["{{base_url}}"], "path": ["api","v1","jobs"], "query": [{"key":"q","value":"node"},{"key":"location","value":"Dhaka"},{"key":"page","value":"1"},{"key":"limit","value":"20"}] }
-          }
-        },
-        {
-          "name": "Close Job",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{ \"status\": \"closed\" }" },
-            "url": { "raw": "{{base_url}}/api/v1/jobs/{{jobId}}/close", "host": ["{{base_url}}"], "path": ["api","v1","jobs","{{jobId}}","close"] }
-          }
-        }
-      ]
+        "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api","v1","auth","register"] }
+      }
     },
-
     {
-      "name": "Applications",
-      "item": [
-        {
-          "name": "Apply to Job (Candidate)",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"resumeUrl\": \"https://example.com/resume.pdf\",\n  \"coverLetter\": \"I am excited to apply\"\n}"
-            },
-            "url": { "raw": "{{base_url}}/api/v1/applications", "host": ["{{base_url}}"], "path": ["api","v1","applications"] }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var json = pm.response.json();",
-                  "if (json._id) { pm.collectionVariables.set('applicationId', json._id); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
+      "name": "Register Admin",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Admin One\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"Password123\",\n  \"role\": \"admin\"\n}"
         },
-        {
-          "name": "Get Applications for My Jobs (Recruiter)",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/jobs/{{jobId}}/applications", "host": ["{{base_url}}"], "path": ["api","v1","jobs","{{jobId}}","applications"] }
-          }
-        },
-        {
-          "name": "Update Application Status (Recruiter/Admin)",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "body": { "mode": "raw", "raw": "{ \"status\": \"interview\", \"internalNotes\": \"Strong candidate\" }" },
-            "url": { "raw": "{{base_url}}/api/v1/applications/{{applicationId}}", "host": ["{{base_url}}"], "path": ["api","v1","applications","{{applicationId}}"] }
-          }
-        },
-        {
-          "name": "Withdraw Application (Candidate)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{}" },
-            "url": { "raw": "{{base_url}}/api/v1/applications/{{applicationId}}/withdraw", "host": ["{{base_url}}"], "path": ["api","v1","applications","{{applicationId}}","withdraw"] }
-          }
-        }
-      ]
+        "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api","v1","auth","register"] }
+      }
     },
-
     {
-      "name": "Messaging & Notifications",
-      "item": [
-        {
-          "name": "Send Message to Candidate (Recruiter)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
-            "body": { "mode": "raw", "raw": "{ \"toUserId\": \"{{userId}}\", \"subject\": \"Interview Invitation\", \"body\": \"Please join for interview at 10 AM\" }" },
-            "url": { "raw": "{{base_url}}/api/v1/messages", "host": ["{{base_url}}"], "path": ["api","v1","messages"] }
-          }
+      "name": "Login User",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
         },
-        {
-          "name": "Get Inbox",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/messages/inbox", "host": ["{{base_url}}"], "path": ["api","v1","messages","inbox"] }
-          }
-        },
-        {
-          "name": "Get Notifications",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/notifications", "host": ["{{base_url}}"], "path": ["api","v1","notifications"] }
-          }
-        }
-      ]
+        "url": { "raw": "{{base_url}}/api/v1/auth/login", "host": ["{{base_url}}"], "path": ["api","v1","auth","login"] }
+      }
     },
-
     {
-      "name": "Offers & Onboarding",
-      "item": [
-        {
-          "name": "Create Offer (Recruiter)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"salary\": 50000,\n  \"startDate\": \"2025-12-01\",\n  \"notes\": \"Welcome to team\"\n}"
-            },
-            "url": { "raw": "{{base_url}}/api/v1/offers", "host": ["{{base_url}}"], "path": ["api","v1","offers"] }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var json = pm.response.json();",
-                  "if (json._id) pm.collectionVariables.set('offerId', json._id);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Get Offers (Candidate)",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/offers", "host": ["{{base_url}}"], "path": ["api","v1","offers"] }
-          }
-        },
-        {
-          "name": "Accept Offer (Candidate)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{ \"accept\": true }" },
-            "url": { "raw": "{{base_url}}/api/v1/offers/{{offerId}}/respond", "host": ["{{base_url}}"], "path": ["api","v1","offers","{{offerId}}","respond"] }
-          }
-        }
-      ]
+      "name": "Refresh Token",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{}" },
+        "url": { "raw": "{{base_url}}/api/v1/auth/refresh", "host": ["{{base_url}}"], "path": ["api","v1","auth","refresh"] }
+      }
     },
-
     {
-      "name": "Admin",
-      "item": [
-        {
-          "name": "List All Users (Admin)",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/admin/users", "host": ["{{base_url}}"], "path": ["api","v1","admin","users"] }
-          }
-        },
-        {
-          "name": "Suspend User",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{ \"reason\": \"Policy violation\" }" },
-            "url": { "raw": "{{base_url}}/api/v1/admin/users/{{userId}}/suspend", "host": ["{{base_url}}"], "path": ["api","v1","admin","users","{{userId}}","suspend"] }
-          }
-        },
-        {
-          "name": "Impersonate User (Admin)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{}" },
-            "url": { "raw": "{{base_url}}/api/v1/admin/users/{{userId}}/impersonate", "host": ["{{base_url}}"], "path": ["api","v1","admin","users","{{userId}}","impersonate"] }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var json = pm.response.json();",
-                  "if (json.token) pm.collectionVariables.set('token', json.token);",
-                  "if (json.impersonatedUser) pm.collectionVariables.set('userId', json.impersonatedUser.id);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Export Audit Logs (CSV)",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/admin/audit/export?format=csv&limit=10000", "host": ["{{base_url}}"], "path": ["api","v1","admin","audit","export"], "query": [{ "key": "format", "value": "csv" }, { "key": "limit", "value": "10000" }] }
-          }
-        },
-        {
-          "name": "Get Audit Logs (JSON)",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/admin/audit?limit=100&offset=0", "host": ["{{base_url}}"], "path": ["api","v1","admin","audit"], "query": [{ "key": "limit", "value": "100" }, { "key": "offset", "value": "0" }] }
-          }
-        },
-
-        {
-          "name": "Platform Reports / Analytics",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/admin/reports/overview?from=2025-01-01&to=2025-12-31", "host": ["{{base_url}}"], "path": ["api","v1","admin","reports","overview"], "query": [{ "key": "from", "value": "2025-01-01" }, { "key": "to", "value": "2025-12-31" }] }
-          }
-        }
-      ]
-    },
-
-    {
-      "name": "Search & Utilities",
-      "item": [
-        {
-          "name": "Full Text Candidate Search (Recruiter/Admin)",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base_url}}/api/v1/search/candidates?q=node&page=1&limit=20", "host": ["{{base_url}}"], "path": ["api","v1","search","candidates"], "query": [{ "key": "q", "value": "node" }, { "key": "page", "value": "1" }, { "key": "limit", "value": "20" }] }
-          }
-        },
-        {
-          "name": "Autocomplete Jobs (for frontend typeahead)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": { "raw": "{{base_url}}/api/v1/search/jobs/suggest?q=back", "host": ["{{base_url}}"], "path": ["api","v1","search","jobs","suggest"], "query": [{ "key": "q", "value": "back" }] }
-          }
-        }
-      ]
-    },
-
-    {
-      "name": "Payments & Subscriptions (stubs)",
-      "item": [
-        {
-          "name": "Create Payment Intent (Stripe) - stub",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" }],
-            "body": { "mode": "raw", "raw": "{ \"amount\": 5000, \"currency\": \"bdt\", \"description\": \"Recruiter subscription\" }" },
-            "url": { "raw": "{{base_url}}/api/v1/payments/create-intent", "host": ["{{base_url}}"], "path": ["api","v1","payments","create-intent"] }
-          }
-        },
-        {
-          "name": "Webhook Receiver (example)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{ \"type\": \"payment.succeeded\", \"data\": {} }" },
-            "url": { "raw": "{{base_url}}/api/v1/payments/webhook", "host": ["{{base_url}}"], "path": ["api","v1","payments","webhook"] }
-          }
-        }
-      ]
-    },
-
-    {
-      "name": "Dev Utilities",
-      "item": [
-        {
-          "name": "Health Check",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
-          }
-        },
-        {
-          "name": "Seed Admin (dev only) - creates admin user",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{ \"email\": \"admin@example.com\", \"password\": \"AdminPass123\" }" },
-            "url": { "raw": "{{base_url}}/dev/seed-admin", "host": ["{{base_url}}"], "path": ["dev","seed-admin"] }
-          }
-        }
-      ]
+      "name": "Logout User",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{}" },
+        "url": { "raw": "{{base_url}}/api/v1/auth/logout", "host": ["{{base_url}}"], "path": ["api","v1","auth","logout"] }
+      }
     }
-
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:5000" },
+    { "key": "email", "value": "john@example.com" },
+    { "key": "password", "value": "Password123" }
   ]
 }

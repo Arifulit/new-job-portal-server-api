@@ -1,5 +1,4 @@
 export interface UpdateAdminProfileDTO {
-  firstName?: string;
-  lastName?: string;
+  name?: string;
   email?: string;
 }
