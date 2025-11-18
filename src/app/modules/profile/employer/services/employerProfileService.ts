@@ -1,7 +1,8 @@
 // ...existing code...
 import { Types } from "mongoose";
 import { EmployerProfile } from "../models/EmployerProfile";
-import { Company } from "../models/Company";
+import Company from "../../../company/models/Company";
+// import { Company } from "../models/Company";
 // DTO import removed because 'dto/index.ts' is not exporting a module; use 'any' for DTO parameters below
 
 export const createEmployerProfile = async (data: any) => {

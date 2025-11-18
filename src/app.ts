@@ -42,12 +42,8 @@ app.get("/", (req: Request, res: Response) => {
   res.status(200).json({ message: "Welcome to the Job Portal API" });
 });
 
-app.use(errorHandler ?? ((err, req, res, next) => { // fallback
-  // eslint-disable-next-line no-console
-  console.error(err);
-  res.status(500).json({ message: "Internal Server Error" });
-}));
+app.use(errorHandler);
 
-app.use(notFound ?? ((req, res) => res.status(404).json({ message: "Not Found" })));
+app.use(notFound);
 
 export default app;

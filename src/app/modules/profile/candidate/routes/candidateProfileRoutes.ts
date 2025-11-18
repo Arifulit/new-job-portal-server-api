@@ -44,19 +44,23 @@ import asyncHandler from "../../../../utils/asyncHandler";
 import {
   createCandidateProfileController,
   getCandidateProfileController,
-  updateCandidateProfileController
+  updateCandidateProfileController,
+  getCurrentCandidateProfileController
 } from "../controllers/candidateProfileController";
 import authMiddleware, { optionalAuth } from "../../../../middleware/auth";
 
 const router = Router();
 
-// GET /api/v1/candidate/profile/:userId
+// GET /api/v1/profile/candidate/profile - Get current user's candidate profile (if authenticated)
+router.get("/", optionalAuth, asyncHandler(getCurrentCandidateProfileController));
+
+// GET /api/v1/profile/candidate/profile/:userId - Public access (optional auth for additional info)
 router.get("/:userId", optionalAuth, asyncHandler(getCandidateProfileController));
 
-// POST /api/v1/candidate/profile
+// POST /api/v1/profile/candidate/profile
 router.post("/", authMiddleware(["Candidate"]), asyncHandler(createCandidateProfileController));
 
-// PUT /api/v1/candidate/profile/:userId
+// PUT /api/v1/profile/candidate/profile/:userId
 router.put("/:userId", authMiddleware(["Candidate"]), asyncHandler(updateCandidateProfileController));
 
 export default router;
