@@ -45,63 +45,51 @@ export const updateJob = async (id: string, data: IJobUpdateData) => {
   }
 };
 
-// // export const getJobs = async (options: GetJobsOptions = {}) => {
-// //   const {
-// //     filters = {},
-// //     sort = { createdAt: -1 },
-// //     skip = 0,
-// //     limit = 10,
-// //     select = '',
-// //     populate = [
-// //       { path: 'createdBy', select: 'name email' },
-// //       { path: 'company', select: 'name logo' }
-// //     ]
-// //   } = options;
+// export const getJobs = async (options: GetJobsOptions = {}) => {
+//   const {
+//     filters = {},
+//     sort = { createdAt: -1 },
+//     skip = 0,
+//     limit = 10,
+//     select = '',
+//     populate = [
+//       { path: 'createdBy', select: 'name email' },
+//       { path: 'company', select: 'name logo' }
+//     ],
+//     company
+//   } = options;
 
-// //   try {
-// //     let query = Job.find(filters)
-// //       .sort(sort)
-// //       .skip(skip)
-// //       .limit(limit)
-// //       .select(select);
+//   // Add company to filters if provided
+//   if (company) {
+//     filters.company = company;
+//   }
 
-// //     // Apply population
-// //     if (populate) {
-// //       if (Array.isArray(populate)) {
-// //         populate.forEach(p => {
-// //           query = query.populate(p);
-// //         });
-// //       } else {
-// //         query = query.populate(populate);
-// //       }
-// //     }
+//   try {
+//     let query = Job.find(filters)
+//       .sort(sort)
+//       .skip(skip)
+//       .limit(limit)
+//       .select(select);
 
-// //     return await query.lean().exec();
-// //   } catch (error) {
-// //     console.error('Error in getJobs service:', error);
-// //     throw new Error(`Failed to fetch jobs: ${error instanceof Error ? error.message : String(error)}`);
-// //   }
-// // };
+//     // Apply population with type assertions to avoid complex union types
+//     if (populate) {
+//       if (Array.isArray(populate)) {
+//         // Type assertion to any[] to avoid complex union types
+//         query = query.populate(populate as any[]);
+//       } else {
+//         // Type assertion for string or object populate
+//         query = query.populate(populate as string | Record<string, string>);
+//       }
+//     }
 
-// // export const countJobs = async (filters: any = {}) => {
-// //   try {
-// //     return await Job.countDocuments(filters);
-// //   } catch (error) {
-// //     console.error('Error in countJobs service:', error);
-// //     throw new Error(`Failed to count jobs: ${error instanceof Error ? error.message : String(error)}`);
-// //   }
-// // };
+//     return await query.lean().exec();
+//   } catch (error) {
+//     console.error('Error in getJobs service:', error);
+//     throw new Error(`Failed to fetch jobs: ${error instanceof Error ? error.message : String(error)}`);
+//   }
+// };
 
-// // export const searchJobs = async (searchTerm: string, options: any = {}) => {
-// //   const {
-// //     filters = {},
-// //     sort = { score: { $meta: 'textScore' } },
-// //     limit = 10,
-// //     page = 1
-// This is a clean separation from the commented code above
-// The commented code has been removed to fix the syntax error
 
-// Update the getJobs function to include company in the filters
 export const getJobs = async (options: GetJobsOptions = {}) => {
   const {
     filters = {},
@@ -122,22 +110,67 @@ export const getJobs = async (options: GetJobsOptions = {}) => {
   }
 
   try {
+    // Handle text search if search query is provided
+    if (filters.$text) {
+      await Job.syncIndexes(); // Ensure text index exists
+    }
+
     let query = Job.find(filters)
       .sort(sort)
       .skip(skip)
       .limit(limit)
       .select(select);
 
-    // Apply population with type assertions to avoid complex union types
+    // Apply population with proper type handling
     if (populate) {
       if (Array.isArray(populate)) {
-        // Type assertion to any[] to avoid complex union types
-        query = query.populate(populate as any[]);
+        populate.forEach(populateOption => {
+          query = query.populate(populateOption);
+        });
       } else {
-        // Type assertion for string or object populate
-        query = query.populate(populate as string | Record<string, string>);
+        query = query.populate(populate);
       }
     }
+
+    // If no text search, use regex for case-insensitive search on title and description
+    if (!filters.$text && (filters.title || filters.description)) {
+      const orConditions = [];
+      if (filters.title) {
+        orConditions.push({ title: { $regex: filters.title, $options: 'i' } });
+        delete filters.title;
+      }
+      if (filters.description) {
+        orConditions.push({ description: { $regex: filters.description, $options: 'i' } });
+        delete filters.description;
+      }
+      if (orConditions.length > 0) {
+        query = query.or(orConditions);
+      }
+    }
+
+    // Handle location search with regex
+    if (filters.location) {
+      query = query.where('location', new RegExp(filters.location, 'i'));
+      delete filters.location;
+    }
+
+    // Handle array filters
+    if (filters.jobType && Array.isArray(filters.jobType)) {
+      query = query.where('jobType').in(filters.jobType);
+      delete filters.jobType;
+    }
+
+    if (filters.experienceLevel && Array.isArray(filters.experienceLevel)) {
+      query = query.where('experienceLevel').in(filters.experienceLevel);
+      delete filters.experienceLevel;
+    }
+
+    // Apply remaining filters
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        query = query.where(key).equals(value);
+      }
+    });
 
     return await query.lean().exec();
   } catch (error) {
@@ -145,7 +178,6 @@ export const getJobs = async (options: GetJobsOptions = {}) => {
     throw new Error(`Failed to fetch jobs: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
-
 export const closeJob = async (jobId: string, userId: Types.ObjectId | string) => {
   try {
     const job = await Job.findById(jobId);
@@ -160,17 +192,40 @@ export const closeJob = async (jobId: string, userId: Types.ObjectId | string) =
     
     // Check if the user is the owner or admin
     const isOwner = createdByIdStr === userIdStr;
-    const isAdmin = false; // Replace with actual admin check if needed
+    const isAdmin = req.user?.role === 'admin'; // Assuming role is available in req.user
     
     if (!isOwner && !isAdmin) {
       throw new Error('Not authorized to close this job');
     }
     
+    // Update job status to closed
     job.status = 'closed';
     job.updatedAt = new Date();
     
-    return await job.save();
+    // Save and return the updated job
+    const updatedJob = await job.save();
+    return updatedJob.toObject();
+    
   } catch (error) {
-    throw new Error(`Failed to close job: ${error instanceof Error ? error.message : String(error)}`);
+    console.error('Error in closeJob service:', error);
+    throw error; // Re-throw to be handled by the controller
+  }
+};
+
+export const getJobById = async (id: string) => {
+  try {
+    const job = await Job.findById(id)
+      .populate('createdBy', 'name email')
+      .populate('company', 'name logo')
+      .lean()
+      .exec();
+    
+    if (!job) {
+      throw new Error('Job not found');
+    }
+    
+    return job;
+  } catch (error) {
+    throw new Error(`Failed to get job: ${error instanceof Error ? error.message : String(error)}`);
   }
 };

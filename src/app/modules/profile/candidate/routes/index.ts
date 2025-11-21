@@ -21,20 +21,16 @@ router.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // IMPORTANT: Define specific routes BEFORE router.use() for sub-routes
-// GET /api/v1/profile/candidate - Get current user's candidate profile (if authenticated)
-router.get("/", optionalAuth, asyncHandler(getCurrentCandidateProfileController));
+// Handle the /profile route
+router.route("/profile")
+  // GET /api/v1/candidate/profile - Get current user's candidate profile
+  .get(optionalAuth, asyncHandler(getCurrentCandidateProfileController))
+  // POST /api/v1/candidate/profile - Create candidate profile
+  .post(authMiddleware(["Candidate"]), asyncHandler(createCandidateProfileController))
+  // PUT /api/v1/candidate/profile - Update current user's candidate profile
+  .put(authMiddleware(["Candidate"]), asyncHandler(updateCurrentCandidateProfileController));
 
-// POST /api/v1/profile/candidate - Create candidate profile
-router.post("/", authMiddleware(["Candidate"]), asyncHandler(createCandidateProfileController));
-
-// PUT /api/v1/profile/candidate - Update current user's candidate profile
-router.put("/", authMiddleware(["Candidate"]), asyncHandler(updateCurrentCandidateProfileController));
-
-// Sub-routes - these must come AFTER the root routes
-// /api/v1/profile/candidate/profile
-router.use("/profile", candidateProfileRoutes);
-
-// /api/v1/profile/candidate/resume
+// Mount sub-routes
 router.use("/resume", resumeRoutes);
 
 export default router;

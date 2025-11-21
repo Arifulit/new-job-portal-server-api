@@ -18,7 +18,11 @@ export interface UpdateAdminProfileDTO {
 }
 
 export const createAdminProfile = async (data: CreateAdminProfileDTO) => {
-  return await AdminProfile.create(data);
+  // Create a new instance to trigger pre-save hooks
+  const admin = new AdminProfile(data);
+  // Save the admin (this will trigger the pre-save hook for password hashing)
+  await admin.save();
+  return admin;
 };
 
 export const getAdminProfile = async (id: string) => {

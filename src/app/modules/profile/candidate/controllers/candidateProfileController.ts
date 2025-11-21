@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Types } from "mongoose";
 import * as candidateProfileService from "../services/candidateProfileService";
 
 export const createCandidateProfileController = async (req: Request, res: Response) => {
@@ -55,18 +56,29 @@ export const getCurrentCandidateProfileController = async (req: Request, res: Re
     }
 
     console.log("🟦 User authenticated, userId:", req.user.id);
-    const profile = await candidateProfileService.getCandidateProfile(req.user.id);
+    let profile = await candidateProfileService.getCandidateProfile(req.user.id);
     
+    // If no profile exists, return an empty profile with default values
     if (!profile) {
-      console.log("⚠️ Controller: Profile not found for userId:", req.user.id);
-      return res.status(404).json({ 
-        success: false, 
-        message: "Profile not found",
-        error: {
-          code: "PROFILE_NOT_FOUND",
-          description: "No candidate profile exists for this user. Please create a profile first.",
-          solution: "Make a POST request to create a new profile"
-        }
+      profile = {
+        user: new Types.ObjectId(req.user.id.toString()),
+        personalInfo: {
+          name: "",
+          email: req.user.email || "",
+          phone: "",
+          address: ""
+        },
+        education: [],
+        experience: [],
+        skills: [],
+        resume: undefined,
+        isNew: true // Flag to indicate this is a new profile
+      };
+      
+      return res.status(200).json({
+        success: true,
+        data: profile,
+        message: "No profile found. Please update to create a new profile."
       });
     }
 
@@ -131,41 +143,64 @@ export const getCandidateProfileController = async (req: Request, res: Response)
 
 export const updateCurrentCandidateProfileController = async (req: Request, res: Response) => {
   try {
-    console.log("🟦 Controller: Updating current candidate profile");
+    console.log("🟦 Controller: Updating/Creating current candidate profile");
     console.log("🟦 User from request:", req.user);
     console.log("🟦 Update data:", req.body);
     
-    // If user is authenticated, update their profile
-    if (req.user?.id) {
-      console.log("🟦 User authenticated, userId:", req.user.id);
-      await candidateProfileService.updateCandidateProfile(
-        req.user.id,
-        req.body
-      );
+    // Check if user is authenticated
+    if (!req.user?.id) {
+      console.log("⚠️ Controller: No user authenticated");
+      return res.status(401).json({ 
+        success: false, 
+        message: "Authentication required. Please log in to update your profile."
+      });
+    }
+
+    const userId = req.user.id;
+    console.log("🟦 User authenticated, userId:", userId);
+    
+    // Check if profile exists
+    let profile = await candidateProfileService.getCandidateProfile(userId);
+    
+    // If profile doesn't exist, create a new one
+    if (!profile) {
+      console.log("ℹ️  Profile doesn't exist, creating new one");
+      const profileData = {
+        user: userId,
+        ...req.body,
+        // Ensure required fields have default values if not provided
+        personalInfo: {
+          email: req.user.email || "",
+          phone: "",
+          address: "",
+          ...req.body.personalInfo
+        },
+        education: req.body.education || [],
+        experience: req.body.experience || [],
+        skills: req.body.skills || []
+      };
       
-      const profile = await candidateProfileService.getCandidateProfile(req.user.id);
-      
-      if (!profile) {
-        console.log("⚠️ Controller: Profile not found after update");
-        return res.status(404).json({
-          success: false,
-          message: "Profile not found"
-        });
-      }
-      
-      console.log("✅ Controller: Profile updated successfully");
-      return res.status(200).json({ 
-        success: true, 
-        message: "Profile successfully updated",
-        data: profile 
+      profile = await candidateProfileService.createCandidateProfile(profileData);
+      console.log("✅ Controller: New profile created successfully");
+      return res.status(201).json({
+        success: true,
+        message: "Profile created successfully",
+        data: profile
       });
     }
     
-    // If not authenticated, return error
-    console.log("⚠️ Controller: No user authenticated");
-    return res.status(401).json({ 
-      success: false, 
-      message: "Please authenticate with a valid token to update your profile" 
+    // If profile exists, update it
+    console.log("ℹ️  Updating existing profile");
+    await candidateProfileService.updateCandidateProfile(userId, req.body);
+    
+    // Get the updated profile
+    const updatedProfile = await candidateProfileService.getCandidateProfile(userId);
+    
+    console.log("✅ Controller: Profile updated successfully");
+    return res.status(200).json({ 
+      success: true, 
+      message: "Profile updated successfully",
+      data: updatedProfile 
     });
   } catch (error: any) {
     console.error("❌ Controller Error (updateCurrentCandidateProfile):", error.message);

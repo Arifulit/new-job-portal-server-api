@@ -106,7 +106,7 @@ export const register = async (req: Request, res: Response) => {
           name,
           email,
           phone,
-          role: "admin"
+          role: "Admin"
         });
         break;
 

@@ -11,12 +11,15 @@ const router = Router();
 
 // Protected routes (require admin role for create/update/delete)
 router.post("/", authMiddleware(["admin"]), createAdminController);
-router.put("/:id", authMiddleware(["admin"]), updateAdminController);
+router.put("/", authMiddleware(["admin"]), updateAdminController);
 
-// Allow both admin and user roles to view admin profiles
-router.get("/", authMiddleware(["admin", "user"]), getAllAdminsController);
+// Get current admin's profile
+router.get("/", authMiddleware(["admin", "user"]), getAdminController);
 
-// Public route to get admin profile by ID (optional auth, but requires auth for certain operations)
+// Get specific admin profile by ID (admin only)
+router.get("/all", authMiddleware(["admin"]), getAllAdminsController);
+
+// Get admin profile by ID (public route with optional auth)
 router.get("/:id", optionalAuth, getAdminController);
 
 export default router;

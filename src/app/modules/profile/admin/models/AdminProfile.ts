@@ -33,7 +33,7 @@ const adminProfileSchema = new Schema<IAdminProfile>({
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
+    required: false, // Made password optional
     minlength: [6, 'Password must be at least 6 characters long'],
     select: false
   },
@@ -70,12 +70,21 @@ adminProfileSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
   try {
-    const salt = await (await import('bcryptjs')).genSalt(10);
-    this.password = await (await import('bcryptjs')).hash(this.password, salt);
+    if (this.password) {
+      const salt = await (await import('bcryptjs')).genSalt(10);
+      this.password = await (await import('bcryptjs')).hash(this.password, salt);
+    }
     next();
   } catch (error: any) {
     next(error);
   }
 });
+
+// Method to set or update password
+adminProfileSchema.methods.setPassword = async function(password: string) {
+  this.password = password;
+  await this.save();
+  return this;
+};
 
 export const AdminProfile = model<IAdminProfile>("AdminProfile", adminProfileSchema);

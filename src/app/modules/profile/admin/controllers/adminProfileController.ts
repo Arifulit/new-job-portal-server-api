@@ -1,4 +1,5 @@
-import { Request, Response } from "express";
+import { Response } from "express";
+import { AuthenticatedRequest } from "@/types/express";
 import * as adminService from "../services/adminProfileService";
 import bcrypt from "bcryptjs";
 import { AdminProfile } from "../models/AdminProfile";
@@ -6,21 +7,26 @@ import { AdminProfile } from "../models/AdminProfile";
 // Create initial admin if not exists
 export const ensureAdminExists = async () => {
   try {
-    const adminEmail = "admin@example.com";
+    const adminEmail = process.env.DEFAULT_ADMIN_EMAIL || "admin@example.com";
+    const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || "admin123";
+    
     let admin = await AdminProfile.findOne({ email: adminEmail });
     
     if (!admin) {
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash("admin123", salt);
-      
-      admin = await adminService.createAdminProfile({
-        name: "Admin User",
+      // Create a new admin instance to trigger pre-save hooks
+      admin = new AdminProfile({
+        name: process.env.DEFAULT_ADMIN_NAME || "Admin User",
         email: adminEmail,
-        password: hashedPassword,
-        role: "admin" // Changed from "Admin" to "admin" to match enum
+        password: adminPassword, // Will be hashed by pre-save hook
+        role: "Admin",
+        phone: process.env.DEFAULT_ADMIN_PHONE || ""
       });
+      
+      // Save the admin (this will trigger the pre-save hook)
+      await admin.save();
+      
       console.log("✅ Initial admin user created:", admin.email);
-      console.log("🔑 Default password: admin123");
+      console.log("🔑 Default password:", adminPassword);
       console.log("⚠️ Please change this password after first login!");
     } else {
       console.log("ℹ️  Admin user already exists:", admin.email);
@@ -32,26 +38,49 @@ export const ensureAdminExists = async () => {
   }
 };
 
-// Call this function when the server starts
-ensureAdminExists().catch(console.error);
-
-// Call this when the server starts
-ensureAdminExists().catch(console.error);
-
+// Admin Profile Controllers
 export const createAdminController = async (req: Request, res: Response) => {
   try {
-    const { password, ...adminData } = req.body;
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const { name, email, password, phone } = req.body;
     
-    const admin = await adminService.createAdminProfile({
-      ...adminData,
-      password: hashedPassword
+    // Validate required fields
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email, and password are required"
+      });
+    }
+    
+    // Check if email already exists
+    const existingAdmin = await AdminProfile.findOne({ email });
+    if (existingAdmin) {
+      return res.status(400).json({
+        success: false,
+        message: "Email already in use"
+      });
+    }
+    
+    // Create admin profile with all required fields
+    const admin = new AdminProfile({
+      name,
+      email,
+      password, // Will be hashed by pre-save hook
+      role: "Admin",
+      phone: phone || ""
     });
     
-    // Don't send password hash in response
-    const { password: _, ...adminWithoutPassword } = admin.toObject();
-    res.status(201).json({ success: true, data: adminWithoutPassword });
+    // Save the admin (this will trigger the pre-save hook)
+    await admin.save();
+    
+    // Convert to object and remove password before sending response
+    const adminObject = admin.toObject();
+    delete adminObject.password;
+    
+    res.status(201).json({ 
+      success: true, 
+      message: "Admin created successfully",
+      data: adminObject
+    });
   } catch (error: any) {
     res.status(400).json({ 
       success: false, 
@@ -60,75 +89,161 @@ export const createAdminController = async (req: Request, res: Response) => {
   }
 };
 
-export const getAdminController = async (req: Request, res: Response) => {
+// In adminProfileController.ts
+// export const getAdminController = async (req: AuthenticatedRequest, res: Response) => {
+//   try {
+//     // Use either the ID from params (for public access) or from the authenticated user
+//     const adminId = req.params.id || req.user?.id;
+    
+//     if (!adminId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Admin ID is required"
+//       });
+//     }
+
+//     // Include password and phone in the query, exclude only __v
+//     const admin = await AdminProfile.findById(adminId).select('-__v').lean();
+    
+//     if (!admin) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Admin not found"
+//       });
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       data: admin
+//     });
+//   } catch (error: any) {
+//     console.error('Error in getAdminController:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: error.message || "Error fetching admin profile"
+//     });
+//   }
+// };
+
+export const getAdminController = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const admin = await adminService.getAdminProfile(req.params.id);
-    if (!admin) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Admin not found" 
+    const adminId = req.params.id || req.user?.id;
+    
+    if (!adminId) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin ID is required"
       });
     }
-    // Don't send password hash in response
-    const { password, ...adminWithoutPassword } = admin.toObject();
-    res.status(200).json({ success: true, data: adminWithoutPassword });
+
+    // Include all fields except the ones we explicitly exclude
+    const admin = await AdminProfile.findById(adminId)
+      .select('+password')  // Include password if needed
+      .lean();
+
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: admin
+    });
   } catch (error: any) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || "Error fetching admin" 
+    console.error('Error in getAdminController:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Error fetching admin profile"
+    });
+  }
+};
+export const updateAdminController = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const adminId = req.user.id;
+    const updateData = { ...req.body };
+
+    // Find the admin
+    let admin = await AdminProfile.findById(adminId);
+
+    if (!admin) {
+      // If admin doesn't exist, ensure we have the name field
+      if (!updateData.name) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name is required'
+        });
+      }
+
+      // Create new admin with provided fields
+      admin = new AdminProfile({
+        _id: adminId,
+        name: updateData.name,
+        email: updateData.email || '',
+        role: 'Admin',
+        ...(updateData.phone && { phone: updateData.phone })
+      });
+    } else {
+      // For existing admin, update only provided fields except email and role
+      if (updateData.name !== undefined) {
+        admin.name = updateData.name;
+      }
+      if (updateData.phone !== undefined) {
+        admin.phone = updateData.phone;
+      }
+    }
+
+    // Don't allow role to be updated
+    if (updateData.role) {
+      delete admin.role;
+    }
+
+    // Save changes
+    const savedAdmin = await admin.save();
+    const { password, ...result } = savedAdmin.toObject();
+
+    res.status(200).json({
+      success: true,
+      message: "Operation successful",
+      data: result
+    });
+
+  } catch (error: any) {
+    console.error('Error in updateAdminController:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Operation failed. Please check your input and try again."
     });
   }
 };
 
-// In adminProfileController.ts
-export const updateAdminController = async (req: Request, res: Response) => {
+export const getAllAdminsController = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    // If password is being updated, hash it
-    if (updateData.password) {
-      const salt = await bcrypt.genSalt(10);
-      updateData.password = await bcrypt.hash(updateData.password, salt);
-    }
-
-    const updatedAdmin = await adminService.updateAdminProfile(id, updateData);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
     
-    if (!updatedAdmin) {
-      return res.status(404).json({
-        success: false,
-        message: "Admin profile not found"
-      });
-    }
-
-    // Remove password from the response
-    const { password, ...adminWithoutPassword } = updatedAdmin.toObject();
+    const [admins, total] = await Promise.all([
+      AdminProfile.find().select('-password').skip(skip).limit(limit).lean(),
+      AdminProfile.countDocuments()
+    ]);
     
     res.status(200).json({
       success: true,
-      data: adminWithoutPassword
+      data: admins,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit
+      }
     });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Error updating admin profile"
-    });
-  }
-};
-
-export const getAllAdminsController = async (req: Request, res: Response) => {
-  try {
-    const admins = await adminService.getAllAdmins();
-    // Remove password from all admin objects
-    const adminsWithoutPasswords = admins.map(admin => {
-      const { password, ...adminWithoutPassword } = admin.toObject();
-      return adminWithoutPassword;
-    });
-    res.status(200).json({ success: true, data: adminsWithoutPasswords });
-  } catch (error: any) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || "Error fetching admins" 
+      message: error.message || "Error fetching admins"
     });
   }
 };

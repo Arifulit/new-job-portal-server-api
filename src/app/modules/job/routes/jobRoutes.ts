@@ -75,5 +75,11 @@ router.get(
   authMiddleware(["recruiter", "admin"]) as RequestHandler,
   getJobApplications as RequestHandler
 );
+// Close job route
+router.patch(
+  "/:id/close",
+  authMiddleware(["admin", "recruiter"]) as RequestHandler,
+  closeJob as RequestHandler
+);
 
 export default router;
