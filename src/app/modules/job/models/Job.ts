@@ -1,4 +1,11 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
+
+export interface IStatusHistory {
+  status: 'pending' | 'approved' | 'rejected' | 'closed';
+  changedBy: Types.ObjectId;
+  changedAt: Date;
+  reason?: string;
+}
 
 export interface IJobUpdateData {
   title?: string;
@@ -11,6 +18,13 @@ export interface IJobUpdateData {
   skills?: string[];
   status?: 'pending' | 'approved' | 'rejected' | 'closed';
   rejectionReason?: string;
+  statusHistory?: IStatusHistory[];
+  closedAt?: Date;
+  closedBy?: Types.ObjectId;
+  approvedAt?: Date;
+  approvedBy?: Types.ObjectId;
+  rejectedAt?: Date;
+  rejectedBy?: Types.ObjectId;
 }
 
 export interface IJob extends Document {
@@ -27,6 +41,13 @@ export interface IJob extends Document {
   status: 'pending' | 'approved' | 'rejected' | 'closed';
   isApproved: boolean;
   rejectionReason?: string;
+  statusHistory: IStatusHistory[];
+  closedAt?: Date;
+  closedBy?: Types.ObjectId;
+  approvedAt?: Date;
+  approvedBy?: Types.ObjectId;
+  rejectedAt?: Date;
+  rejectedBy?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,10 +91,32 @@ const jobSchema = new Schema<IJob>({
   rejectionReason: {
     type: String,
     default: ''
-  }
+  },
+  statusHistory: [{
+    status: { 
+      type: String, 
+      enum: ['pending', 'approved', 'rejected', 'closed'],
+      required: true 
+    },
+    changedBy: { 
+      type: Schema.Types.ObjectId, 
+      ref: 'User',
+      required: true 
+    },
+    changedAt: { 
+      type: Date, 
+      default: Date.now 
+    },
+    reason: String
+  }],
+  closedAt: { type: Date },
+  closedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  approvedAt: { type: Date },
+  approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  rejectedAt: { type: Date },
+  rejectedBy: { type: Schema.Types.ObjectId, ref: 'User' },
 }, { 
   timestamps: true,
-  // Add text index for search
   autoIndex: true 
 });
 

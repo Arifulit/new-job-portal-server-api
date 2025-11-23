@@ -25,7 +25,7 @@ import { Schema, model, Types } from "mongoose";
 export interface IApplication {
   candidate: Types.ObjectId;
   job: Types.ObjectId;
-  status: "Applied" | "Reviewed" | "Interview" | "Hired" | "Rejected";
+  status: "Applied" | "Reviewed" | "Interview" | "Hired" | "Rejected" | "Shortlisted" | "Withdrawn";
   resume?: string;
   coverLetter?: string;
 }

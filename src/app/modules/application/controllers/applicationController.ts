@@ -2,21 +2,35 @@ import { Request, Response, RequestHandler } from "express";
 import * as applicationService from "../services/applicationService";
 import { Job } from "../../job/models/Job";
 import { Application } from "../models/Application";
-import { Types } from "mongoose";
+import { Types, Document } from "mongoose";
+
+// Interface for job with populated createdBy field
+interface JobWithCreatedBy extends Document {
+  _id: Types.ObjectId;
+  createdBy?: {
+    _id: Types.ObjectId;
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
 
 // Define authenticated request interface
 export type UserRole = 'admin' | 'recruiter' | 'candidate';
 
 export interface AuthenticatedRequest extends Request {
-  user: {
+  user?: {
     id: string;
     role: UserRole;
-    email: string;
+    email?: string;
   };
 }
 
 export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
     const { job, jobId, resume, resumeUrl, coverLetter } = req.body;
     
     // Use jobId if provided, otherwise use job (for backward compatibility)
@@ -71,6 +85,10 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
 // In applicationController.ts
 export const updateApplication = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
     const { id } = req.params;
     const { status } = req.body;
     const userRole = req.user.role;
@@ -153,6 +171,10 @@ export const updateApplication = async (req: AuthenticatedRequest, res: Response
 
 export const getCandidateApplications = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
     const applications = await applicationService.getApplicationsByCandidate(req.user.id);
     res.status(200).json({ success: true, data: applications });
   } catch (err: any) {
@@ -167,6 +189,10 @@ export const getCandidateApplications = async (req: AuthenticatedRequest, res: R
 // Get job applications with proper authorization
 export const getJobApplications = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
     const { jobId } = req.params;
     const { status } = req.query as { status?: string };
     const userId = req.user.id;
@@ -208,28 +234,7 @@ export const getJobApplications = async (req: AuthenticatedRequest, res: Respons
       // For now, bypass the creator check to allow access
       // This is a temporary solution for testing
       console.log('Bypassing creator check for testing');
-      
-      // Original check (commented out for now)
-      /*
-      if (!job.createdBy || !job.createdBy._id) {
-        console.log('Job creator information not found');
-        return res.status(403).json({ 
-          success: false, 
-          message: 'Not authorized to view these applications' 
-        });
-      }
-      
-      const jobCreatorId = job.createdBy._id.toString();
-      const currentUserId = userId.toString();
-      
-      if (jobCreatorId !== currentUserId) {
-        console.log('Access denied - User is not the creator of this job');
-        return res.status(403).json({ 
-          success: false, 
-          message: 'You can only view applications for jobs you created' 
-        });
-      }
-      */
+    
 
       const query: any = { job: new Types.ObjectId(jobId) };
       if (status) {
@@ -255,33 +260,41 @@ export const getJobApplications = async (req: AuthenticatedRequest, res: Respons
   } catch (error: any) {
     console.error('Error fetching job applications:', error);
     return res.status(500).json({ 
-      success: false, 
-      message: error.message || 'Failed to fetch job applications' 
+      success: false,
+      message: 'Error fetching job applications',
+      error: error.message
     });
   }
 };
 
 export const getJobApplicationsNew = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not authenticated' 
+      });
+    }
+
+    const { jobId } = req.params;
+    if (!jobId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Job ID is required'
+      });
+    }
+
     const userId = req.user.id;
     const userRole = req.user.role;
-    const { jobId } = req.params;
 
     console.log('Request User:', { userId, userRole });
     console.log('Job ID:', jobId);
-
-    if (!userId || !userRole) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Authentication required' 
-      });
-    }
 
     // Get job with createdBy field populated
     const job = await Job.findById(jobId)
       .select('createdBy')
       .populate('createdBy', '_id')
-      .lean();
+      .lean<JobWithCreatedBy>();
     
     if (!job) {
       return res.status(404).json({ 
@@ -303,7 +316,7 @@ export const getJobApplicationsNew = async (req: AuthenticatedRequest, res: Resp
 
     // For recruiter, check if they created the job
     if (userRole === 'recruiter') {
-      const jobCreatorId = job.createdBy?._id?.toString();
+      const jobCreatorId = job.createdBy?.toString();
       console.log('Comparing IDs - Creator:', jobCreatorId, 'User:', userId);
       
       if (!jobCreatorId || jobCreatorId !== userId) {
@@ -334,6 +347,9 @@ export const getJobApplicationsNew = async (req: AuthenticatedRequest, res: Resp
 };
 // In applicationController.ts
 export const getJobAllApplications = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Authentication required' });
+  }
   try {
     const userId = req.user.id;
     const userRole = req.user.role;
@@ -371,6 +387,9 @@ export const getJobAllApplications = async (req: AuthenticatedRequest, res: Resp
 
 // In applicationController.ts
 export const withdrawApplication = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Authentication required' });
+  }
   try {
     const { id } = req.params;
     const userId = req.user.id;

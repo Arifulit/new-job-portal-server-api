@@ -76,6 +76,37 @@ export const rejectJob: AuthenticatedHandler = async (req, res, next) => {
 };
 
 // Get pending jobs (Admin only)
+// Close a job (Admin only)
+export const closeJob: AuthenticatedHandler = async (req, res, next) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin can close jobs'
+      });
+    }
+
+    const { jobId } = req.params;
+
+    if (!jobId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Job ID is required'
+      });
+    }
+
+    const job = await jobService.closeJob(jobId, req.user._id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Job closed successfully',
+      data: job
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getPendingJobs: AuthenticatedHandler = async (req, res, next) => {
   try {
     if (req.user?.role !== 'admin') {
@@ -111,6 +142,107 @@ export const getPendingJobs: AuthenticatedHandler = async (req, res, next) => {
         ]
       }),
       Job.countDocuments({ status: 'pending' })
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: jobs,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const adminGetApprovedJobs: AuthenticatedHandler = async (req, res, next) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin can view approved jobs'
+      });
+    }
+
+    const { 
+      page = 1, 
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(String(limit), 10) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const sort: { [key: string]: 1 | -1 } = {};
+    sort[String(sortBy)] = sortOrder === 'asc' ? 1 : -1;
+
+    const [jobs, total] = await Promise.all([
+      jobService.adminGetApprovedJobs({
+        filters: { status: 'approved', isApproved: true },
+        sort,
+        skip,
+        limit: limitNum,
+        populate: [
+          { path: 'createdBy', select: 'name email' },
+          { path: 'company', select: 'name logo' }
+        ]
+      }),
+      Job.countDocuments({ status: 'approved', isApproved: true })
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: jobs,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+// In jobAdminController.ts, add this before the last closing brace
+export const adminGetAllJobs: AuthenticatedHandler = async (req, res, next) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin can view all jobs'
+      });
+    }
+
+    const { 
+      page = 1, 
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      ...filters
+    } = req.query;
+
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const sort: { [key: string]: 1 | -1 } = {};
+    sort[String(sortBy)] = sortOrder === 'asc' ? 1 : -1;
+
+    const [jobs, total] = await Promise.all([
+      jobService.getAllJobsForAdmin({
+        filters,
+        sort,
+        skip,
+        limit: limitNum
+      }),
+      Job.countDocuments(filters)
     ]);
 
     return res.status(200).json({

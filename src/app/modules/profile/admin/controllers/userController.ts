@@ -238,3 +238,4 @@ export const getAllRecruitersController = async (req: Request, res: Response) =>
     });
   }
 };
+
