@@ -1,7 +1,15 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import authMiddleware from '../../../middleware/auth';
-import * as jobAdminController from '../controllers/jobAdminController';
 import * as jobController from '../controllers/jobController';
+import { 
+  getPendingJobs, 
+  adminGetApprovedJobs,
+  adminGetAllJobs,
+  getRecruiterJobs,
+  approveJob,
+  rejectJob,
+  closeJob
+} from '../controllers/jobAdminController';
 import { json } from 'body-parser';
 import { AuthenticatedRequest } from '../../../../types/express';
 import { Types } from 'mongoose';
@@ -82,33 +90,25 @@ const parseQueryParams = (req: AuthenticatedRequest, res: Response, next: NextFu
   next();
 };
 
-// Admin job management routes
-<<<<<<< HEAD
-router.get('/', parseQueryParams, jobController.getAllJobs as any);
-router.get('/pending', parseQueryParams, jobAdminController.getPendingJobs as any);
-router.get('/approved', parseQueryParams, jobAdminController.adminGetApprovedJobs as any);
-router.get('/recruiter-jobs', parseQueryParams, jobAdminController.getRecruiterJobs as any);
-router.get('/:id', jobController.getJobById as any);
-
-=======
-// In adminJobRoutes.ts, update the imports at the top
+// Import additional controller functions
 import { 
   getPendingJobs, 
   adminGetApprovedJobs,
-  adminGetAllJobs  // Add this import
+  adminGetAllJobs,
+  getRecruiterJobs
 } from '../controllers/jobAdminController';
 
-// Then update the routes section to include the new /all route
+// Admin job management routes
 router.get('/', parseQueryParams, jobController.getAllJobs as any);
 router.get('/pending', parseQueryParams, getPendingJobs as any);
 router.get('/approved', parseQueryParams, adminGetApprovedJobs as any);
-router.get('/all', parseQueryParams, adminGetAllJobs as any);  // Add this line
+router.get('/all', parseQueryParams, adminGetAllJobs as any);
+router.get('/recruiter-jobs', parseQueryParams, getRecruiterJobs as any);
 router.get('/:id', jobController.getJobById as any);
->>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
 // Job approval workflow
-router.post('/:jobId/approve', ensureBody, jobAdminController.approveJob as any);
-router.post('/:jobId/reject', ensureBody, jobAdminController.rejectJob as any);
-router.post('/:jobId/close', ensureBody, jobAdminController.closeJob as any);
+router.post('/:jobId/approve', ensureBody, approveJob as any);
+router.post('/:jobId/reject', ensureBody, rejectJob as any);
+router.post('/:jobId/close', ensureBody, closeJob as any);
 
 // Job CRUD operations
 router.put('/:id', ensureBody, jobController.updateJob as any);

@@ -183,7 +183,7 @@ export const adminGetApprovedJobs: AuthenticatedHandler = async (req, res, next)
     sort[String(sortBy)] = sortOrder === 'asc' ? 1 : -1;
 
     const [jobs, total] = await Promise.all([
-      jobService.adminGetApprovedJobs({
+      jobService.getApprovedJobs({
         filters: { status: 'approved', isApproved: true },
         sort,
         skip,
@@ -210,23 +210,13 @@ export const adminGetApprovedJobs: AuthenticatedHandler = async (req, res, next)
     next(error);
   }
 };
-<<<<<<< HEAD
-
-// Get all jobs created by recruiters (Admin only)
-export const getRecruiterJobs: AuthenticatedHandler = async (req, res, next) => {
-=======
 // In jobAdminController.ts, add this before the last closing brace
 export const adminGetAllJobs: AuthenticatedHandler = async (req, res, next) => {
->>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
   try {
     if (req.user?.role !== 'admin') {
       return res.status(403).json({
         success: false,
-<<<<<<< HEAD
-        message: 'Only admin can view recruiter jobs'
-=======
         message: 'Only admin can view all jobs'
->>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
       });
     }
 
@@ -235,26 +225,77 @@ export const adminGetAllJobs: AuthenticatedHandler = async (req, res, next) => {
       limit = 10,
       sortBy = 'createdAt',
       sortOrder = 'desc',
-<<<<<<< HEAD
       status,
-      ...filters
-    } = req.query;
-
-    const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(String(limit), 10) || 10));
-=======
       ...filters
     } = req.query;
 
     const pageNum = Math.max(1, Number(page) || 1);
     const limitNum = Math.min(100, Math.max(1, Number(limit) || 10));
->>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
     const skip = (pageNum - 1) * limitNum;
 
     const sort: { [key: string]: 1 | -1 } = {};
     sort[String(sortBy)] = sortOrder === 'asc' ? 1 : -1;
 
-<<<<<<< HEAD
+    // Build filters
+    const queryFilters: any = { ...filters };
+    if (status) {
+      queryFilters.status = status;
+    }
+
+    const [jobs, total] = await Promise.all([
+      jobService.getJobs({
+        filters: queryFilters,
+        sort,
+        skip,
+        limit: limitNum,
+        populate: [
+          { path: 'createdBy', select: 'name email role' },
+          { path: 'company', select: 'name logo' }
+        ]
+      }),
+      Job.countDocuments(queryFilters)
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: jobs,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getRecruiterJobs: AuthenticatedHandler = async (req, res, next) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin can view recruiter jobs'
+      });
+    }
+
+    const { 
+      page = 1, 
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      status,
+      ...filters
+    } = req.query;
+
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const sort: { [key: string]: 1 | -1 } = {};
+    sort[String(sortBy)] = sortOrder === 'asc' ? 1 : -1;
+
     // Build filters
     const queryFilters: any = { ...filters };
     if (status) {
@@ -274,20 +315,10 @@ export const adminGetAllJobs: AuthenticatedHandler = async (req, res, next) => {
       }),
       Job.countDocuments({ 
         createdBy: { 
-          $in: await (await import('../../user/models/User')).find({ role: 'recruiter' }).distinct('_id')
+          $in: await (await import('../../auth/models/User')).find({ role: 'recruiter' }).distinct('_id')
         },
         ...queryFilters
       })
-=======
-    const [jobs, total] = await Promise.all([
-      jobService.getAllJobsForAdmin({
-        filters,
-        sort,
-        skip,
-        limit: limitNum
-      }),
-      Job.countDocuments(filters)
->>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
     ]);
 
     return res.status(200).json({
@@ -303,40 +334,4 @@ export const adminGetAllJobs: AuthenticatedHandler = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-<<<<<<< HEAD
 };
-// ...existing code...
-export const getAllJobsForAdminOrRecruiter: AuthenticatedHandler = async (req, res, next) => {
-  try {
-    const role = req.user?.role;
-    if (!role || !['admin', 'recruiter'].includes(role)) {
-      return res.status(403).json({ success: false, message: 'Forbidden: insufficient permissions' });
-    }
-
-    const page = Math.max(1, parseInt(String(req.query.page || 1), 10));
-    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || 50), 10)));
-    const skip = (page - 1) * limit;
-
-    const filter: any = {};
-    // optional: allow status/company filters via query params
-    if (req.query.status) filter.status = String(req.query.status);
-    if (req.query.company) filter.company = String(req.query.company);
-
-    const [jobs, total] = await Promise.all([
-      Job.find(filter).populate('createdBy', 'name email role').populate('company', 'name logo').skip(skip).limit(limit).sort({ createdAt: -1 }).lean().exec(),
-      Job.countDocuments(filter)
-    ]);
-
-    return res.status(200).json({
-      success: true,
-      data: jobs,
-      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-// ...existing code...
-=======
-};
->>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
