@@ -1,3 +1,4 @@
+import { Request } from 'express';
 import { JwtPayload } from 'jsonwebtoken';
 
 declare global {
@@ -12,15 +13,24 @@ declare global {
   }
 }
 
-import { Request } from 'express';
-
-export interface AuthenticatedRequest extends Request {
-  user: {
+interface AuthenticatedRequest extends Request {
+  user?: {
     id: string;
     role: 'admin' | 'candidate' | 'recruiter';
-    email?: string;  // Made email optional with '?'
+    email?: string;
     [key: string]: any;
   };
 }
 
-export {};
+export { AuthenticatedRequest };
+
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: {
+      id: string;
+      role: 'admin' | 'candidate' | 'recruiter';
+      email?: string;
+      [key: string]: any;
+    };
+  }
+}

@@ -142,31 +142,6 @@ export const updateUserRole = async (userId: string, newRole: string) => {
   }
 };
 
-// export const getAllUsers = async () => {
-//   try {
-//     const [allUsers, candidates, recruiters] = await Promise.all([
-//       getAllUsersFromDB(),
-//       getAllCandidates(),
-//       getAllRecruiters()
-//     ]);
-    
-//     const result: any = {
-//       totalUsers: allUsers.length,
-//       totalCandidates: candidates.length,
-//       totalRecruiters: recruiters.length
-//     };
-    
-//     // Only include non-empty arrays in the response
-//     if (allUsers.length > 0) result.allUsers = allUsers;
-//     if (candidates.length > 0) result.candidates = candidates;
-//     if (recruiters.length > 0) result.recruiters = recruiters;
-    
-//     return result;
-//   } catch (error) {
-//     console.error('Error fetching users data:', error);
-//     throw error;
-//   }
-// };
 
 
 export const getAllUsers = async () => {

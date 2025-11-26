@@ -47,14 +47,16 @@
 // export default router;
 
 // src/app/modules/application/routes/applicationRoutes.ts
-import { Router } from "express";
+import { RequestHandler, Router } from "express";
 import { 
   applyJob, 
   getCandidateApplications, 
   updateApplication,
   getJobApplications,
   getJobApplicationsNew,
-  getJobAllApplications
+  getJobAllApplications,
+  getApplicationsByUser,
+  getApplicationCountByUser
 } from "../controllers/applicationController";
 import { authMiddleware } from "../../../middleware/auth";
 
@@ -96,6 +98,19 @@ router.post(
   "/:id/withdraw",
   authMiddleware(["candidate"]),
   withdrawApplication
+);
+
+router.get(
+  "/user/:userId",
+  authMiddleware() as RequestHandler,
+  (req, res, next) => getApplicationsByUser(req as any, res, next)
+);
+
+// Get count of applications for a specific user (protected)
+router.get(
+  "/user/:userId/count",
+  authMiddleware() as RequestHandler,
+  (req, res, next) => getApplicationCountByUser(req as any, res, next)
 );
 
 export default router;

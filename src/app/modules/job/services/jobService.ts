@@ -103,6 +103,54 @@ export const rejectJob = async (jobId: string, adminId: Types.ObjectId | string,
   }
 };
 
+export const closeJob = async (jobId: string, userId: Types.ObjectId | string, userRole?: string) => {
+  try {
+    const job = await Job.findById(jobId);
+    
+    if (!job) {
+      throw new Error('Job not found');
+    }
+    
+    // Convert both IDs to strings for comparison
+    const userIdStr = userId.toString();
+    const createdByIdStr = job.createdBy?.toString();
+    
+    // Check if the user is the owner or admin
+    const isOwner = createdByIdStr === userIdStr;
+    const isAdmin = userRole === 'admin';
+    
+    if (!isOwner && !isAdmin) {
+      throw new Error('Not authorized to close this job');
+    }
+    
+    // Update job status to closed
+    job.status = 'closed';
+    job.closedAt = new Date();
+    job.closedBy = userId;
+    
+    // Add to status history
+    job.statusHistory = job.statusHistory || [];
+    job.statusHistory.push({
+      status: 'closed',
+      changedBy: userId,
+      changedAt: new Date(),
+      reason: isAdmin ? 'Closed by admin' : 'Closed by job poster'
+    });
+    
+    // Save and return the updated job
+    const updatedJob = await job.save();
+    
+    // Populate necessary fields before returning
+    return await Job.findById(updatedJob._id)
+      .populate('createdBy', 'name email')
+      .populate('company', 'name logo');
+      
+  } catch (error) {
+    console.error('Error in closeJob service:', error);
+    throw new Error(`Failed to close job: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
 export const getPendingJobs = async (options: GetJobsOptions = {}): Promise<IJob[]> => {
   return getJobs({
     ...options,
@@ -230,44 +278,53 @@ export const deleteJob = async (id: string) => {
   }
 };
 
-export const closeJob = async (jobId: string, userId: Types.ObjectId | string, userRole?: string) => {
-  try {
-    const job = await Job.findById(jobId);
-    
-    if (!job) {
-      throw new Error('Job not found');
-    }
-    
-    // Convert both IDs to strings for comparison
-    const userIdStr = userId.toString();
-    const createdByIdStr = job.createdBy?.toString();
-    
-    // Check if the user is the owner or admin
-    const isOwner = createdByIdStr === userIdStr;
-    const isAdmin = userRole === 'admin';
-    
-    if (!isOwner && !isAdmin) {
-      throw new Error('Not authorized to close this job');
-    }
-    
-    // Update job status to closed
-    job.status = 'closed';
-    job.updatedAt = new Date();
-    
-    // Save and return the updated job
-    const updatedJob = await job.save();
-    return updatedJob.toObject();
-    
-  } catch (error) {
-    console.error('Error in closeJob service:', error);
-    throw error; // Re-throw to be handled by the controller
-  }
-};
-
 interface PopulatedJob extends Omit<IJob, 'createdBy' | 'company'> {
   createdBy: { _id: Types.ObjectId; name: string; email: string };
   company: { _id: Types.ObjectId; name: string; logo?: string };
 }
+
+export const getJobsByCreatorRole = async (role: string, options: GetJobsOptions = {}): Promise<IJob[]> => {
+  try {
+    const { 
+      filters = {},
+      sort = { createdAt: -1 },
+      skip = 0,
+      limit = 10,
+      populate = [
+        { path: 'createdBy', select: 'name email role' },
+        { path: 'company', select: 'name logo' }
+      ]
+    } = options;
+
+    // First, find users with the specified role
+    const User = (await import('../../user/models/User')).default;
+    const users = await User.find({ role }).select('_id').lean();
+    const userIds = users.map(user => user._id);
+
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    // Add user filter to find jobs created by these users
+    const queryFilters = {
+      ...filters,
+      createdBy: { $in: userIds }
+    };
+
+    // Get jobs with pagination and sorting
+    const jobs = await Job.find(queryFilters)
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .populate(populate)
+      .lean();
+
+    return jobs;
+  } catch (error) {
+    console.error('Error in getJobsByCreatorRole service:', error);
+    throw new Error(`Failed to fetch jobs by creator role: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
 
 export const getJobById = async (id: string): Promise<PopulatedJob> => {
   try {

@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from "../../../../types/express";
 import { 
   createJob, 
   updateJob, 
-  getJobs, 
+  getAllJobs, 
   getJobById, 
   deleteJob,
   closeJob,
@@ -12,6 +12,7 @@ import {
 import { getJobApplications } from "../../application/controllers/applicationController";
 import { authMiddleware } from "../../../middleware/auth";
 import adminJobRoutes from "./adminJobRoutes";
+import { getAllJobsForAdminOrRecruiter } from "../controllers/jobAdminController";
 
 const router = Router();
 
@@ -38,8 +39,11 @@ const handleRoute = (
 router.get(
   "/",
   authMiddleware() as RequestHandler,
-  handleRoute(getJobs)
+  handleRoute(getAllJobs)
 );
+
+router.get('/all', authMiddleware(["admin", "recruiter"]) as RequestHandler, handleRoute(getAllJobsForAdminOrRecruiter));
+// Job applications routes
 
 router.get(
   "/:id",
@@ -48,7 +52,7 @@ router.get(
 );
 
 router.post(
-  "/", 
+  "/create", 
   authMiddleware(["admin", "recruiter"]) as RequestHandler,
   handleRoute(createJob)
 );
@@ -89,7 +93,8 @@ router.delete(
   handleRoute(deleteJob)
 );
 
-// Job applications routes
+// ...existing code...
+
 router.get(
   "/:jobId/applications",
   authMiddleware(["recruiter", "admin"]) as RequestHandler,

@@ -15,8 +15,6 @@ type SearchOptions = {
 export type AuthenticatedHandler = (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<Response | void>;
 
 // Get job by ID
-// In jobController.ts
-// In jobController.ts
 export const getJobById = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -55,8 +53,7 @@ export const getJobById = async (req: AuthenticatedRequest, res: Response, next:
   }
 };
 
-
-// Input validation middleware for job creation
+// Input validation for job creation
 const validateJobInput = (data: any): { isValid: boolean; message?: string } => {
   if (!data.title || typeof data.title !== 'string' || data.title.trim().length < 5) {
     return { isValid: false, message: 'Title is required and must be at least 5 characters long' };
@@ -70,9 +67,9 @@ const validateJobInput = (data: any): { isValid: boolean; message?: string } => 
   return { isValid: true };
 };
 
-export const createJob: AuthenticatedHandler = async (req, res, next) => {
+// Create a new job
+const createJob: AuthenticatedHandler = async (req, res, next) => {
   try {
-    // Type guard to ensure user is defined
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -99,7 +96,7 @@ export const createJob: AuthenticatedHandler = async (req, res, next) => {
 
     const jobData = {
       ...req.body,
-      createdBy: new Types.ObjectId(req.user.id) // Ensure proper ObjectId type
+      createdBy: new Types.ObjectId(req.user.id)
     };
     
     const job = await jobService.createJob(jobData);
@@ -112,8 +109,8 @@ export const createJob: AuthenticatedHandler = async (req, res, next) => {
   }
 };
 
-// Update job - only admin or the recruiter who created it can update
-export const updateJob: AuthenticatedHandler = async (req, res, next) => {
+// Update job
+const updateJob: AuthenticatedHandler = async (req, res, next) => {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -124,7 +121,6 @@ export const updateJob: AuthenticatedHandler = async (req, res, next) => {
 
     const jobId = req.params.id;
     
-    // Basic validation of job ID
     if (!jobId || !Types.ObjectId.isValid(jobId)) {
       return res.status(400).json({
         success: false,
@@ -170,54 +166,12 @@ export const updateJob: AuthenticatedHandler = async (req, res, next) => {
       data: updatedJob 
     });
   } catch (error: any) {
-    // Log the detailed error for debugging
-    console.error('Error in updateJob:', {
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
-      ...(error.errors && { errors: error.errors }),
-      ...(error.code && { code: error.code })
-    });
-
-    // Handle specific error types
-    if (error.message === 'Job not found' || error.message.includes('not found')) {
-      return res.status(404).json({
-        success: false,
-        message: 'Job not found'
-      });
-    }
-    
-    // Handle validation errors
-    if (error.name === 'ValidationError' || error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: error.message || 'Validation failed',
-        ...(error.errors && { errors: error.errors })
-      });
-    }
-    
-    // Handle duplicate key errors
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'Duplicate key error. A job with this identifier already exists.'
-      });
-    }
-    
-    // Return the actual error message in development for debugging
-    const errorMessage = process.env.NODE_ENV === 'development' 
-      ? error.message 
-      : 'An error occurred while updating the job';
-    
-    res.status(500).json({
-      success: false,
-      message: errorMessage
-    });
+    next(error);
   }
 };
 
-// Delete job - only admin or the recruiter who created it can delete
-export const deleteJob: AuthenticatedHandler = async (req, res, next) => {
+// Delete job
+const deleteJob: AuthenticatedHandler = async (req, res, next) => {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -228,7 +182,6 @@ export const deleteJob: AuthenticatedHandler = async (req, res, next) => {
 
     const jobId = req.params.id;
     
-    // Basic validation of job ID
     if (!jobId || !Types.ObjectId.isValid(jobId)) {
       return res.status(400).json({
         success: false,
@@ -257,19 +210,17 @@ export const deleteJob: AuthenticatedHandler = async (req, res, next) => {
       message: 'Job deleted successfully' 
     });
   } catch (error: any) {
-    // Handle specific error types
     if (error.message === 'Job not found') {
       return res.status(404).json({
         success: false,
         message: 'Job not found'
       });
     }
-    
-    // Pass other errors to the error handling middleware
     next(error);
   }
 };
 
+// Close job (Admin only)
 export const closeJob: AuthenticatedHandler = async (req, res, next) => {
   try {
     if (!req.user) {
@@ -356,237 +307,127 @@ export const getPendingJobs: AuthenticatedHandler = async (req, res, next) => {
       });
     }
 
-    const jobs = await jobService.getPendingJobs({
-      filters: {},
-      sort: { createdAt: -1 }
-    });
+    const { 
+      page = 1, 
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const sort: { [key: string]: 1 | -1 } = {};
+    sort[String(sortBy)] = sortOrder === 'asc' ? 1 : -1;
+
+    const [jobs, total] = await Promise.all([
+      jobService.getPendingJobs({
+        filters: { status: 'pending' },
+        sort,
+        skip,
+        limit: limitNum,
+        populate: [
+          { path: 'createdBy', select: 'name email' },
+          { path: 'company', select: 'name logo' }
+        ]
+      }),
+      Job.countDocuments({ status: 'pending' })
+    ]);
 
     return res.status(200).json({
       success: true,
-      data: jobs
+      data: jobs,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      }
     });
   } catch (error) {
     next(error);
   }
 };
 
-
-// export const getJobs = async (req: AuthenticatedRequest, res: Response) => {
-
-//   try {
-//     const { 
-//       page = '1', 
-//       limit = '10',
-//       search,
-//       location,
-//       jobType,
-//       experienceLevel,
-//       status,
-//       salaryMin,
-//       salaryMax,
-//       company,
-//       sortBy = 'createdAt',
-//       sortOrder = 'desc'
-//     } = req.query as {
-//       page?: string;
-//       limit?: string;
-//       search?: string;
-//       location?: string;
-//       jobType?: string | string[];
-//       experienceLevel?: string | string[];
-//       status?: string;
-//       salaryMin?: string;
-//       salaryMax?: string;
-//       company?: string;
-//       sortBy?: string;
-//       sortOrder?: string;
-//     };
-
-//     // Build filters
-//     const filters: any = {};
-    
-//     if (location) filters.location = new RegExp(String(location), 'i');
-//     if (search) filters.title = new RegExp(String(search), 'i');
-//     if (search) filters.title = new RegExp(String(search), 'i');
-//     if (company) filters.company = new RegExp(String(company), 'i');
-    
-//     if (jobType) {
-//       filters.jobType = { 
-//         $in: Array.isArray(jobType) 
-//           ? jobType.map(String) 
-//           : [String(jobType)] 
-//       };
-//     }
-    
-//     if (experienceLevel) {
-//       filters.experienceLevel = { 
-//         $in: Array.isArray(experienceLevel) 
-//           ? experienceLevel.map(String) 
-//           : [String(experienceLevel)]
-//       };
-//     }
-    
-//     if (salaryMin || salaryMax) {
-//       filters.salary = {};
-//       if (salaryMin) filters.salary.$gte = Number(salaryMin);
-//       if (salaryMax) filters.salary.$lte = Number(salaryMax);
-//     }
-
-//     // If there's a search query, use text search
-//     // Removed this block as 'q' is not defined in the query parameters
-
-//     // If no search query, use regular filtering
-//     const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
-//     const limitNum = Math.min(100, Math.max(1, parseInt(String(limit), 10) || 10));
-//     const skip = (pageNum - 1) * limitNum;
-
-//     // Build sort object
-//     const sort: { [key: string]: 1 | -1 } = {};
-//     const sortDirection = sortOrder === 'asc' ? 1 : -1;
-//     sort[sortBy] = sortDirection;
-
-//     // Execute query with pagination
-//     const [jobs, total] = await Promise.all([
-//       jobService.getJobs({
-//         filters,
-//         sort,
-//         skip,
-//         limit: limitNum,
-//         populate: [
-//           { path: 'createdBy', select: 'name email' },
-//           { path: 'company', select: 'name logo' }
-//         ]
-//       }),
-//       Job.countDocuments(filters)
-//     ]);
-
-//     return res.status(200).json({
-//       success: true,
-//       data: jobs,
-//       pagination: {
-//         total,
-//         page: pageNum,
-//         limit: limitNum,
-//         totalPages: Math.ceil(total / limitNum)
-//       }
-//     });
-
-//   } catch (error) {
-//     console.error('Error in getJobs controller:', error);
-//     return res.status(500).json({
-//       success: false,
-//       message: 'An error occurred while fetching jobs'
-//     });
-//   }
-// };
-
-
-export const getJobs = async (req: AuthenticatedRequest, res: Response) => {
+// Get approved jobs
+const getApprovedJobs: AuthenticatedHandler = async (req, res, next) => {
   try {
     const { 
-      page = '1', 
-      limit = '10',
-      search,
-      location,
-      skills,
-      minSalary,
-      maxSalary,
-      company,
-      jobType,
-      experienceLevel,
+      page = 1, 
+      limit = 10,
       sortBy = 'createdAt',
       sortOrder = 'desc'
-    } = req.query as {
-      page?: string;
-      limit?: string;
-      search?: string;
-      location?: string;
-      skills?: string;
-      minSalary?: string;
-      maxSalary?: string;
-      company?: string;
-      jobType?: string | string[];
-      experienceLevel?: string | string[];
-      sortBy?: string;
-      sortOrder?: 'asc' | 'desc';
-    };
+    } = req.query;
 
-    // Build filters
-    const filters: any = { status: 'active' }; // Only show active jobs by default
-    
-    // Text search (title, description, or company name)
-    if (search) {
-      filters.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
 
-    // Location filter (city or country)
-    if (location) {
-      filters.$or = filters.$or || [];
-      filters.$or.push(
-        { 'location.city': { $regex: location, $options: 'i' } },
-        { 'location.country': { $regex: location, $options: 'i' } }
-      );
-    }
+    const sort: { [key: string]: 1 | -1 } = {};
+    sort[String(sortBy)] = sortOrder === 'asc' ? 1 : -1;
 
-    // Skills filter (comma-separated list)
-    if (skills) {
-      const skillsArray = skills.split(',').map(skill => skill.trim());
-      filters.requiredSkills = { $in: skillsArray.map(skill => new RegExp(`^${skill}$`, 'i')) };
-    }
-
-    // Salary range filter
-    if (minSalary || maxSalary) {
-      filters.salary = {};
-      if (minSalary) {
-        filters.salary.$gte = Number(minSalary);
-      }
-      if (maxSalary) {
-        filters.salary.$lte = Number(maxSalary);
-      }
-    }
-
-    // Company filter
-    if (company) {
-      filters['company.name'] = { $regex: company, $options: 'i' };
-    }
-
-    // Job Type filter
-    if (jobType) {
-      filters.jobType = {
-        $in: Array.isArray(jobType) ? jobType : [jobType]
-      };
-    }
-
-    // Experience Level filter
-    if (experienceLevel) {
-      filters.experienceLevel = {
-        $in: Array.isArray(experienceLevel) ? experienceLevel : [experienceLevel]
-      };
-    }
-
-    // Sorting
-    const sort: any = {};
-    if (sortBy) {
-      sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
-    } else {
-      sort.createdAt = -1; // Default sort by newest first
-    }
-
-    // Pagination
-    const pageNumber = Math.max(1, parseInt(page, 10) || 1);
-    const limitNumber = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
-    const skip = (pageNumber - 1) * limitNumber;
-
-    // Get jobs with filters
     const [jobs, total] = await Promise.all([
-      jobService.getJobs({
-        filters,
+      jobService.getApprovedJobs({
+        filters: { status: 'approved', isApproved: true },
         sort,
         skip,
-        limit: limitNumber,
+        limit: limitNum,
+        populate: [
+          { path: 'createdBy', select: 'name email' },
+          { path: 'company', select: 'name logo' }
+        ]
+      }),
+      Job.countDocuments({ status: 'approved', isApproved: true })
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: jobs,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get all jobs with filtering and pagination
+export const getAllJobs: AuthenticatedHandler = async (req, res, next) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      ...filters
+    } = req.query;
+
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const sort: { [key: string]: 1 | -1 } = {};
+    sort[String(sortBy)] = sortOrder === 'asc' ? 1 : -1;
+
+    const queryFilters = {
+      ...filters,
+      ...(!filters?.status && !filters?.isApproved ? {
+        status: 'approved',
+        isApproved: 'true'
+      } : {})
+    };
+
+    const [jobs, total] = await Promise.all([
+      jobService.getJobs({
+        filters: queryFilters,
+        sort,
+        skip,
+        limit: limitNum,
         populate: [
           { path: 'createdBy', select: 'name email' },
           { path: 'company', select: 'name logo' }
@@ -600,20 +441,24 @@ export const getJobs = async (req: AuthenticatedRequest, res: Response) => {
       data: jobs,
       pagination: {
         total,
-        page: pageNumber,
-        limit: limitNumber,
-        totalPages: Math.ceil(total / limitNumber)
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
       }
     });
   } catch (error) {
-    console.error('Error in getJobs:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: {
-        code: 'INTERNAL_SERVER_ERROR',
-        description: error instanceof Error ? error.message : 'An unknown error occurred'
-      }
-    });
+    next(error);
   }
+};
+
+// Export all controllers
+export {
+  getJobById,
+  createJob,
+  updateJob,
+  deleteJob,
+  closeJob,
+  getPendingJobs,
+  getApprovedJobs,
+  getAllJobs
 };
