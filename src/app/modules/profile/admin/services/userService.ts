@@ -109,7 +109,7 @@ export const getAllRecruiters = async () => {
 export const updateUserRole = async (userId: string, newRole: string) => {
   try {
     // Validate the new role
-    const validRoles = ['admin', 'recruiter', 'candidate'];
+    const validRoles = ['super_admin', 'admin', 'recruiter', 'candidate'];
     if (!validRoles.includes(newRole.toLowerCase())) {
       throw new Error(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
     }

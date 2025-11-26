@@ -3,6 +3,7 @@ import * as applicationService from "../services/applicationService";
 import { Job } from "../../job/models/Job";
 import { Application } from "../models/Application";
 import { Types, Document } from "mongoose";
+import { UserRole } from "../../../../types/express";
 
 // Interface for job with populated createdBy field
 interface JobWithCreatedBy extends Document {
@@ -14,9 +15,7 @@ interface JobWithCreatedBy extends Document {
   [key: string]: any;
 }
 
-// Define authenticated request interface
-export type UserRole = 'admin' | 'recruiter' | 'candidate';
-
+// Use the centralized UserRole type from the main types file
 export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;

@@ -1,13 +1,8 @@
+import type { IUser as User } from './express';
+
 // ...existing code...
 declare global {
   namespace Express {
-    interface User {
-      id: string;
-      email?: string;
-      role?: string;
-      [key: string]: any;
-    }
-
     interface Request {
       /**
        * Populated after authentication; optional for public routes.
