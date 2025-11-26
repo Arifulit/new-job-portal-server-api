@@ -49,7 +49,6 @@
 
 // export default app;
 
-
 import "dotenv/config";
 import express, { Request, Response } from "express";
 import cookieParser from "cookie-parser";
@@ -59,7 +58,6 @@ import router from "./app/routes";
 import { errorHandler } from "./app/middleware/errorHandler";
 import notFound from "./app/middleware/notFound";
 
-// ...existing code...
 const app = express();
 
 app.use(cookieParser());
@@ -82,16 +80,20 @@ app.use(
   })
 );
 
-// Configure allowed origin
-const allowedOrigin = process.env.FRONTEND_URL ?? "http://localhost:3000";
+// sanitize FRONTEND_URL (remove trailing slash) and fallback
+// ...existing code...
+// sanitize FRONTEND_URL (remove trailing slash) and allow localhost + render URL
+const allowedOrigins = [
+  (process.env.FRONTEND_URL ?? "https://new-job-portal-server-api.onrender.com").replace(/\/+$/, ""),
+  "http://localhost:5173"
+];
 
-// Global OPTIONS / preflight handler (no path string wildcard)
+// preflight handler: respond to OPTIONS and include Private-Network header when requested
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
     const origin = (req.headers.origin as string) || "";
-    // allow same-origin (no origin) or configured origin
-    if (!origin || origin === allowedOrigin) {
-      res.setHeader("Access-Control-Allow-Origin", origin || allowedOrigin);
+    if (!origin || allowedOrigins.includes(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin || allowedOrigins[0]);
       res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Requested-With,Accept");
@@ -108,8 +110,7 @@ app.use((req, res, next) => {
 app.use(
   cors({
     origin: (origin, callback) => {
-      // allow same-origin requests (no origin) and the configured frontend origin
-      if (!origin || origin === allowedOrigin) return callback(null, true);
+      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
       return callback(new Error("CORS blocked: origin not allowed"), false);
     },
     credentials: true,
@@ -124,9 +125,7 @@ app.get("/", (req: Request, res: Response) => {
   res.status(200).json({ message: "Welcome to the Job Portal API" });
 });
 
-// 404 then error handler
 app.use(notFound);
 app.use(errorHandler);
 
 export default app;
-// ...existing code...
