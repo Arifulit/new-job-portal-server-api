@@ -48,7 +48,6 @@
 
 
 // export default app;
-
 import "dotenv/config";
 import express, { Request, Response } from "express";
 import cookieParser from "cookie-parser";
@@ -66,6 +65,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.set("trust proxy", 1);
 
+// Session config
 app.use(
   session({
     secret: process.env.EXPRESS_SESSION_SECRET ?? process.env.JWT_SECRET ?? "change_this_secret",
@@ -80,15 +80,13 @@ app.use(
   })
 );
 
-// sanitize FRONTEND_URL (remove trailing slash) and fallback
-// ...existing code...
-// sanitize FRONTEND_URL (remove trailing slash) and allow localhost + render URL
+// Allowed origins
 const allowedOrigins = [
   (process.env.FRONTEND_URL ?? "https://job-portal-client-jade-one.vercel.app").replace(/\/+$/, ""),
   "http://localhost:5173"
 ];
 
-// preflight handler: respond to OPTIONS and include Private-Network header when requested
+// Preflight OPTIONS
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
     const origin = (req.headers.origin as string) || "";
@@ -107,6 +105,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// CORS middleware
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -119,6 +118,7 @@ app.use(
   })
 );
 
+// Routes
 app.use("/api/v1", router);
 
 app.get("/", (req: Request, res: Response) => {
