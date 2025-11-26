@@ -84,7 +84,7 @@ app.use(
 // ...existing code...
 // sanitize FRONTEND_URL (remove trailing slash) and allow localhost + render URL
 const allowedOrigins = [
-  (process.env.FRONTEND_URL ?? "https://new-job-portal-server-api.onrender.com").replace(/\/+$/, ""),
+  (process.env.FRONTEND_URL ?? "https://job-portal-client-jade-one.vercel.app").replace(/\/+$/, ""),
   "http://localhost:5173"
 ];
 
