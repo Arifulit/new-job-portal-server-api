@@ -210,14 +210,23 @@ export const adminGetApprovedJobs: AuthenticatedHandler = async (req, res, next)
     next(error);
   }
 };
+<<<<<<< HEAD
 
 // Get all jobs created by recruiters (Admin only)
 export const getRecruiterJobs: AuthenticatedHandler = async (req, res, next) => {
+=======
+// In jobAdminController.ts, add this before the last closing brace
+export const adminGetAllJobs: AuthenticatedHandler = async (req, res, next) => {
+>>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
   try {
     if (req.user?.role !== 'admin') {
       return res.status(403).json({
         success: false,
+<<<<<<< HEAD
         message: 'Only admin can view recruiter jobs'
+=======
+        message: 'Only admin can view all jobs'
+>>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
       });
     }
 
@@ -226,17 +235,26 @@ export const getRecruiterJobs: AuthenticatedHandler = async (req, res, next) => 
       limit = 10,
       sortBy = 'createdAt',
       sortOrder = 'desc',
+<<<<<<< HEAD
       status,
       ...filters
     } = req.query;
 
     const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(String(limit), 10) || 10));
+=======
+      ...filters
+    } = req.query;
+
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 10));
+>>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
     const skip = (pageNum - 1) * limitNum;
 
     const sort: { [key: string]: 1 | -1 } = {};
     sort[String(sortBy)] = sortOrder === 'asc' ? 1 : -1;
 
+<<<<<<< HEAD
     // Build filters
     const queryFilters: any = { ...filters };
     if (status) {
@@ -260,6 +278,16 @@ export const getRecruiterJobs: AuthenticatedHandler = async (req, res, next) => 
         },
         ...queryFilters
       })
+=======
+    const [jobs, total] = await Promise.all([
+      jobService.getAllJobsForAdmin({
+        filters,
+        sort,
+        skip,
+        limit: limitNum
+      }),
+      Job.countDocuments(filters)
+>>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
     ]);
 
     return res.status(200).json({
@@ -275,6 +303,7 @@ export const getRecruiterJobs: AuthenticatedHandler = async (req, res, next) => 
   } catch (error) {
     next(error);
   }
+<<<<<<< HEAD
 };
 // ...existing code...
 export const getAllJobsForAdminOrRecruiter: AuthenticatedHandler = async (req, res, next) => {
@@ -308,3 +337,6 @@ export const getAllJobsForAdminOrRecruiter: AuthenticatedHandler = async (req, r
   }
 };
 // ...existing code...
+=======
+};
+>>>>>>> 15b495b52251226541944fc449b6f251d76d36f8

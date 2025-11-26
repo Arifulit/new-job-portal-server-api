@@ -283,9 +283,22 @@ interface PopulatedJob extends Omit<IJob, 'createdBy' | 'company'> {
   company: { _id: Types.ObjectId; name: string; logo?: string };
 }
 
+<<<<<<< HEAD
 export const getJobsByCreatorRole = async (role: string, options: GetJobsOptions = {}): Promise<IJob[]> => {
   try {
     const { 
+=======
+// In jobService.ts, ensure this export exists
+export type LeanJob = Omit<IJob, keyof Document> & {
+  _id: Types.ObjectId;
+  __v: number;
+  [key: string]: any; // Allow additional properties from Mongoose
+};
+
+export const getAllJobsForAdmin = async (options: GetJobsOptions = {}): Promise<LeanJob[]> => {
+  try {
+    const {
+>>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
       filters = {},
       sort = { createdAt: -1 },
       skip = 0,
@@ -296,6 +309,7 @@ export const getJobsByCreatorRole = async (role: string, options: GetJobsOptions
       ]
     } = options;
 
+<<<<<<< HEAD
     // First, find users with the specified role
     const User = (await import('../../user/models/User')).default;
     const users = await User.find({ role }).select('_id').lean();
@@ -313,12 +327,16 @@ export const getJobsByCreatorRole = async (role: string, options: GetJobsOptions
 
     // Get jobs with pagination and sorting
     const jobs = await Job.find(queryFilters)
+=======
+    const jobs = await Job.find(filters)
+>>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
       .sort(sort)
       .skip(skip)
       .limit(limit)
       .populate(populate)
       .lean();
 
+<<<<<<< HEAD
     return jobs;
   } catch (error) {
     console.error('Error in getJobsByCreatorRole service:', error);
@@ -326,6 +344,14 @@ export const getJobsByCreatorRole = async (role: string, options: GetJobsOptions
   }
 };
 
+=======
+    return jobs as LeanJob[];
+  } catch (error) {
+    console.error('Error in getAllJobsForAdmin service:', error);
+    throw new Error(`Failed to fetch all jobs: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+>>>>>>> 15b495b52251226541944fc449b6f251d76d36f8
 export const getJobById = async (id: string): Promise<PopulatedJob> => {
   try {
     const job = await Job.findById(id)
