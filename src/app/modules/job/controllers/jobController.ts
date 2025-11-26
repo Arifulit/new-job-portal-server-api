@@ -68,7 +68,7 @@ const validateJobInput = (data: any): { isValid: boolean; message?: string } => 
 };
 
 // Create a new job
-const createJob: AuthenticatedHandler = async (req, res, next) => {
+export const createJob: AuthenticatedHandler = async (req, res, next) => {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -110,7 +110,7 @@ const createJob: AuthenticatedHandler = async (req, res, next) => {
 };
 
 // Update job
-const updateJob: AuthenticatedHandler = async (req, res, next) => {
+export const updateJob: AuthenticatedHandler = async (req, res, next) => {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -171,7 +171,7 @@ const updateJob: AuthenticatedHandler = async (req, res, next) => {
 };
 
 // Delete job
-const deleteJob: AuthenticatedHandler = async (req, res, next) => {
+export const deleteJob: AuthenticatedHandler = async (req, res, next) => {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -351,7 +351,7 @@ export const getPendingJobs: AuthenticatedHandler = async (req, res, next) => {
 };
 
 // Get approved jobs
-const getApprovedJobs: AuthenticatedHandler = async (req, res, next) => {
+export const getApprovedJobs: AuthenticatedHandler = async (req, res, next) => {
   try {
     const { 
       page = 1, 
@@ -451,14 +451,4 @@ export const getAllJobs: AuthenticatedHandler = async (req, res, next) => {
   }
 };
 
-// Export all controllers
-export {
-  getJobById,
-  createJob,
-  updateJob,
-  deleteJob,
-  closeJob,
-  getPendingJobs,
-  getApprovedJobs,
-  getAllJobs
-};
+

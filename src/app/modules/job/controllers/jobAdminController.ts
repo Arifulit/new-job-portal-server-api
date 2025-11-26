@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import * as jobService from '../services/jobService';
 import { AuthenticatedRequest } from '../../../../types/express';
 import { Job } from '../models/Job';
+import { Types } from 'mongoose';
 
 type AuthenticatedHandler = (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<Response | void>;
 
@@ -315,7 +316,7 @@ export const getRecruiterJobs: AuthenticatedHandler = async (req, res, next) => 
       }),
       Job.countDocuments({ 
         createdBy: { 
-          $in: await (await import('../../auth/models/User')).find({ role: 'recruiter' }).distinct('_id')
+          $in: await (await import('../../auth/models/User')).User.find({ role: 'recruiter' }).distinct('_id')
         },
         ...queryFilters
       })

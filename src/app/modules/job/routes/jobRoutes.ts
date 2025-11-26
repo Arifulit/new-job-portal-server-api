@@ -7,12 +7,14 @@ import {
   getJobById, 
   deleteJob,
   closeJob,
-  AuthenticatedHandler
+  AuthenticatedHandler,
+  getPendingJobs,
+  getApprovedJobs
 } from "../controllers/jobController";
 import { getJobApplications } from "../../application/controllers/applicationController";
 import { authMiddleware } from "../../../middleware/auth";
 import adminJobRoutes from "./adminJobRoutes";
-import { getAllJobsForAdminOrRecruiter } from "../controllers/jobAdminController";
+import { adminGetAllJobs } from "../controllers/jobAdminController";
 
 const router = Router();
 
@@ -42,7 +44,7 @@ router.get(
   handleRoute(getAllJobs)
 );
 
-router.get('/all', authMiddleware(["admin", "recruiter"]) as RequestHandler, handleRoute(getAllJobsForAdminOrRecruiter));
+router.get('/all', authMiddleware(["admin", "recruiter"]) as RequestHandler, handleRoute(adminGetAllJobs));
 // Job applications routes
 
 router.get(

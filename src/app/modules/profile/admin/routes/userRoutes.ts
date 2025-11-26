@@ -3,7 +3,7 @@
 
 import { Router, Request, Response, NextFunction } from "express";
 import { authMiddleware } from "../../../../middleware/auth";
-import { AuthenticatedRequest } from "../../../../types/express";
+import { AuthenticatedRequest } from "../../../../../types/express/index";
 import {
   getAllUsersController,
   getAllCandidatesController,

@@ -151,6 +151,13 @@ export const getAdminController = async (req: Request, res: Response) => {
 };
 export const updateAdminController = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+    
     const adminId = req.user.id;
     const updateData = { ...req.body };
 

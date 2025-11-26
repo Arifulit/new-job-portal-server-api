@@ -16,6 +16,22 @@ export interface IJobUpdateData extends Partial<Omit<IJob, 'createdBy' | 'create
   // Add any additional fields that can be updated
 }
 
+export const getJobById = async (id: string) => {
+  try {
+    const job = await Job.findById(id)
+      .populate('createdBy', 'name email')
+      .populate('company', 'name logo');
+    
+    if (!job) {
+      throw new Error('Job not found');
+    }
+    
+    return job;
+  } catch (error) {
+    throw new Error(`Failed to get job: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
 export const createJob = async (data: Omit<IJob, 'createdAt' | 'updatedAt'>) => {
   try {
     // Set default status to pending for new jobs
@@ -126,13 +142,13 @@ export const closeJob = async (jobId: string, userId: Types.ObjectId | string, u
     // Update job status to closed
     job.status = 'closed';
     job.closedAt = new Date();
-    job.closedBy = userId;
+    job.closedBy = typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
     
     // Add to status history
     job.statusHistory = job.statusHistory || [];
     job.statusHistory.push({
       status: 'closed',
-      changedBy: userId,
+      changedBy: typeof userId === 'string' ? new Types.ObjectId(userId) : userId,
       changedAt: new Date(),
       reason: isAdmin ? 'Closed by admin' : 'Closed by job poster'
     });
@@ -278,15 +294,15 @@ export const deleteJob = async (id: string) => {
   }
 };
 
-interface PopulatedJob extends Omit<IJob, 'createdBy' | 'company'> {
-  createdBy: { _id: Types.ObjectId; name: string; email: string };
-  company: { _id: Types.ObjectId; name: string; logo?: string };
-}
+export type JobCreator = { _id: Types.ObjectId; name: string; email: string };
+export type JobCompany = { _id: Types.ObjectId; name: string; logo?: string };
 
 export type LeanJob = Omit<IJob, keyof Document> & {
   _id: Types.ObjectId;
   __v: number;
-  [key: string]: any; // Allow additional properties from Mongoose
+  createdBy: Types.ObjectId | JobCreator;
+  company: Types.ObjectId | JobCompany;
+  [key: string]: any; // For any additional properties that might be present
 };
 
 export const getJobsByCreatorRole = async (
@@ -309,9 +325,9 @@ export const getJobsByCreatorRole = async (
 
     if (role) {
       // First, find users with the specified role
-      const User = (await import('../../user/models/User')).default;
+      const { User } = await import('../../auth/models/User');
       const users = await User.find({ role }).select('_id').lean();
-      const userIds = users.map(user => user._id);
+      const userIds = users.map((user: { _id: Types.ObjectId }) => user._id);
 
       if (userIds.length === 0) {
         return [];
@@ -329,10 +345,10 @@ export const getJobsByCreatorRole = async (
       .sort(sort)
       .skip(skip)
       .limit(limit)
-      .populate(populate)
+      .populate(Array.isArray(populate) ? populate : [populate])
       .lean();
 
-    return jobs as LeanJob[];
+    return jobs as unknown as LeanJob[];
   } catch (error) {
     console.error('Error in getJobsByCreatorRole service:', error);
     throw new Error(`Failed to fetch jobs by creator role: ${error instanceof Error ? error.message : String(error)}`);

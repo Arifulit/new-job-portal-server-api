@@ -1,15 +1,21 @@
-import { Request, Response } from "express";
+import { Response } from "express";
+import { Types } from "mongoose";
+import { AuthenticatedRequest } from "../../../../types/express";
 import * as paymentService from "../services/paymentService";
 
-export const createPaymentController = async (req: Request, res: Response) => {
+export const createPaymentController = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
+
     const { plan, paymentMethod } = req.body;
 
     // Define price based on plan
     const planAmount = plan === "Basic" ? 10 : plan === "Standard" ? 30 : 50;
 
     const payment = await paymentService.createPayment({
-      user: req.user.id,
+      user: new Types.ObjectId(req.user.id),
       plan,
       amount: planAmount,
       status: "Pending",
@@ -25,8 +31,12 @@ export const createPaymentController = async (req: Request, res: Response) => {
   }
 };
 
-export const getPaymentsController = async (req: Request, res: Response) => {
+export const getPaymentsController = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
+
     const payments = await paymentService.getUserPayments(req.user.id);
     res.status(200).json({ success: true, data: payments });
   } catch (err: any) {

@@ -1,15 +1,7 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction, RequestHandler } from 'express';
 import authMiddleware from '../../../middleware/auth';
 import * as jobController from '../controllers/jobController';
-import { 
-  getPendingJobs, 
-  adminGetApprovedJobs,
-  adminGetAllJobs,
-  getRecruiterJobs,
-  approveJob,
-  rejectJob,
-  closeJob
-} from '../controllers/jobAdminController';
+import * as jobAdminController from '../controllers/jobAdminController';
 import { json } from 'body-parser';
 import { AuthenticatedRequest } from '../../../../types/express';
 import { Types } from 'mongoose';
@@ -36,6 +28,9 @@ const ensureBody = (req: Request, res: Response, next: NextFunction): void => {
 
 // Middleware to parse query parameters
 const parseQueryParams = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  // Initialize filters object
+  const filters: Record<string, any> = {};
+  
   // Parse pagination
   const page = parseInt(req.query.page as string) || 1;
   const limit = Math.min(parseInt(req.query.limit as string) || 10, 100);
@@ -45,41 +40,20 @@ const parseQueryParams = (req: AuthenticatedRequest, res: Response, next: NextFu
   let sort: Record<string, 1 | -1> = { createdAt: -1 }; // Default sort by newest
   if (req.query.sortBy) {
     const sortBy = (req.query.sortBy as string).split(',');
+    const direction = (req.query.direction as string) || 'desc';
     sort = {};
     sortBy.forEach(field => {
-      if (field.startsWith('-')) {
-        sort[field.slice(1)] = -1;
-      } else {
-        sort[field] = 1;
-      }
+      sort[field] = direction === 'desc' ? -1 as const : 1 as const;
     });
   }
 
-  // Parse filters
-  const filters: any = {};
-  const filterableFields = ['status', 'isApproved', 'employmentType', 'jobType', 'experienceLevel'];
   
-  filterableFields.forEach(field => {
-    if (req.query[field]) {
-      filters[field] = req.query[field];
-    }
-  });
-
-  // Add search
-  if (req.query.search) {
-    filters.$or = [
-      { title: { $regex: req.query.search, $options: 'i' } },
-      { description: { $regex: req.query.search, $options: 'i' } },
-      { 'company.name': { $regex: req.query.search, $options: 'i' } }
-    ];
-  }
-
-  // Add to request object
-  req.queryOptions = {
-    filters,
-    sort,
-    skip,
-    limit,
+  // Build the query options
+  (req as any).queryOptions = {
+    page: typeof page === 'string' ? parseInt(page, 10) : 1,
+    limit: typeof limit === 'string' ? parseInt(limit, 10) : 10,
+    sort: sort as Record<string, 1 | -1>,
+    filters: filters as Record<string, any>,
     select: '-__v',
     populate: [
       { path: 'createdBy', select: 'name email' },
@@ -90,25 +64,69 @@ const parseQueryParams = (req: AuthenticatedRequest, res: Response, next: NextFu
   next();
 };
 
-// Import additional controller functions
-import { 
-  getPendingJobs, 
-  adminGetApprovedJobs,
-  adminGetAllJobs,
-  getRecruiterJobs
-} from '../controllers/jobAdminController';
+// Type guard to check if request is authenticated
+const ensureAuthenticated = (req: Request): req is AuthenticatedRequest => {
+  return !!(req as AuthenticatedRequest).user;
+};
 
 // Admin job management routes
-router.get('/', parseQueryParams, jobController.getAllJobs as any);
-router.get('/pending', parseQueryParams, getPendingJobs as any);
-router.get('/approved', parseQueryParams, adminGetApprovedJobs as any);
-router.get('/all', parseQueryParams, adminGetAllJobs as any);
-router.get('/recruiter-jobs', parseQueryParams, getRecruiterJobs as any);
-router.get('/:id', jobController.getJobById as any);
+router.get('/', 
+  (req, res, next) => {
+    if (!ensureAuthenticated(req)) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    parseQueryParams(req, res, next);
+  },
+  jobController.getAllJobs as RequestHandler
+);
+
+router.get('/pending', 
+  (req, res, next) => {
+    if (!ensureAuthenticated(req)) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    parseQueryParams(req, res, next);
+  },
+  jobAdminController.getPendingJobs as RequestHandler
+);
+
+router.get('/approved', 
+  (req, res, next) => {
+    if (!ensureAuthenticated(req)) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    parseQueryParams(req, res, next);
+  },
+  jobAdminController.adminGetApprovedJobs as RequestHandler
+);
+
+router.get('/all', 
+  (req, res, next) => {
+    if (!ensureAuthenticated(req)) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    parseQueryParams(req, res, next);
+  },
+  jobAdminController.adminGetAllJobs as RequestHandler
+);
+
+router.get('/recruiter-jobs', 
+  (req, res, next) => {
+    if (!ensureAuthenticated(req)) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    parseQueryParams(req, res, next);
+  },
+  jobAdminController.getRecruiterJobs as RequestHandler
+);
+
+// Single job routes
+router.get('/:id', jobController.getJobById as RequestHandler);
+
 // Job approval workflow
-router.post('/:jobId/approve', ensureBody, approveJob as any);
-router.post('/:jobId/reject', ensureBody, rejectJob as any);
-router.post('/:jobId/close', ensureBody, closeJob as any);
+router.post('/:jobId/approve', ensureBody, jobAdminController.approveJob as RequestHandler);
+router.post('/:jobId/reject', ensureBody, jobAdminController.rejectJob as RequestHandler);
+router.post('/:jobId/close', ensureBody, jobAdminController.closeJob as any);
 
 // Job CRUD operations
 router.put('/:id', ensureBody, jobController.updateJob as any);

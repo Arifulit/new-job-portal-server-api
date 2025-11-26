@@ -4,14 +4,16 @@ import { Types } from 'mongoose';
 
 interface AuthenticatedRequest extends Request {
   user?: {
-    _id: Types.ObjectId;
-    role: string;
+    id: string;
+    role: 'recruiter' | 'candidate' | 'admin';
+    email?: string;
+    [key: string]: any; // Allow additional properties
   };
 }
 
 export const getMessages = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user?._id;
+    const userId = req.user?.id;
     const { conversationId } = req.params;
     const { limit = 50, before } = req.query;
 
@@ -58,7 +60,7 @@ export const getMessages = async (req: AuthenticatedRequest, res: Response) => {
 export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { recipient, content, conversationId } = req.body;
-    const sender = req.user?._id;
+    const sender = req.user?.id;
 
     if (!recipient || !content || !conversationId) {
       return res.status(400).json({
@@ -98,7 +100,7 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
 export const markAsRead = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { messageId } = req.params;
-    const userId = req.user?._id;
+    const userId = req.user?.id;
 
     const message = await Message.findOneAndUpdate(
       { _id: messageId, recipient: userId },
