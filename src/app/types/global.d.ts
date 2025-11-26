@@ -1,4 +1,3 @@
-import type { IUser as User } from './express';
 
 // ...existing code...
 declare global {

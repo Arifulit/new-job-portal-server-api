@@ -1,6 +1,6 @@
 import { JwtPayload } from 'jsonwebtoken';
 
-export interface IUser extends JwtPayload {
+export interface User extends JwtPayload {
   id: string;
   role: string;
   email: string;
@@ -9,7 +9,7 @@ export interface IUser extends JwtPayload {
 declare global {
   namespace Express {
     interface Request {
-      user?: IUser;
+      user?: User;
     }
   }
 }

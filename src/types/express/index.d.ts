@@ -42,8 +42,6 @@ declare global {
  * Extended Request type for authenticated routes
  * Use this when you are certain the request is authenticated
  */
-export interface AuthenticatedRequest extends Request {
-  user: User;
-}
+export type AuthenticatedRequest = Request & { user: User };
 
 // No need for empty export {} here since we're using import/export syntax

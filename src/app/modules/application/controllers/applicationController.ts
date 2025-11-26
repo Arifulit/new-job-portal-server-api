@@ -3,7 +3,8 @@ import * as applicationService from "../services/applicationService";
 import { Job } from "../../job/models/Job";
 import { Application } from "../models/Application";
 import { Types, Document } from "mongoose";
-import { UserRole } from "../../../../types/express";
+
+type UserRole = 'admin' | 'recruiter' | 'candidate' | 'employer' | 'user';
 
 // Interface for job with populated createdBy field
 interface JobWithCreatedBy extends Document {
@@ -16,13 +17,13 @@ interface JobWithCreatedBy extends Document {
 }
 
 // Use the centralized UserRole type from the main types file
-export interface AuthenticatedRequest extends Request {
+export type AuthenticatedRequest = Request & {
   user?: {
     id: string;
     role: UserRole;
     email?: string;
   };
-}
+};
 
 export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
   try {
