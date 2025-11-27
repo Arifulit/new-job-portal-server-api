@@ -1,3 +1,5 @@
+
+
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcrypt';
 
@@ -21,7 +23,7 @@ const userSchema = new Schema<IUser>(
     },
     email: {
       type: String,
-      required: true,
+      required: [true, 'Email is required'],
       unique: true,
       trim: true,
       lowercase: true,
@@ -29,6 +31,7 @@ const userSchema = new Schema<IUser>(
     password: {
       type: String,
       required: [true, 'Password is required'],
+      minlength: 6,
     },
     role: {
       type: String,
@@ -52,14 +55,23 @@ const userSchema = new Schema<IUser>(
   }
 );
 
-// Hash password before saving
+// Password hash করার জন্য pre-save middleware
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 10);
-  next();
+  // শুধুমাত্র যখন password পরিবর্তিত হয় তখনই hash করা হবে
+  if (!this.isModified('password')) {
+    return next();
+  }
+
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error as Error);
+  }
 });
 
-// Method to check if password is correct
+// Password verify করার method
 userSchema.methods.isPasswordCorrect = async function (password: string) {
   return await bcrypt.compare(password, this.password);
 };

@@ -212,6 +212,9 @@ export const adminGetApprovedJobs: AuthenticatedHandler = async (req, res, next)
   }
 };
 // In jobAdminController.ts, add this before the last closing brace
+// ...existing code...
+
+// Admin: get all jobs (including pending/rejected/approved) with pagination & filters
 export const adminGetAllJobs: AuthenticatedHandler = async (req, res, next) => {
   try {
     if (req.user?.role !== 'admin') {
@@ -221,12 +224,11 @@ export const adminGetAllJobs: AuthenticatedHandler = async (req, res, next) => {
       });
     }
 
-    const { 
-      page = 1, 
+    const {
+      page = 1,
       limit = 10,
       sortBy = 'createdAt',
       sortOrder = 'desc',
-      status,
       ...filters
     } = req.query;
 
@@ -237,11 +239,10 @@ export const adminGetAllJobs: AuthenticatedHandler = async (req, res, next) => {
     const sort: { [key: string]: 1 | -1 } = {};
     sort[String(sortBy)] = sortOrder === 'asc' ? 1 : -1;
 
-    // Build filters
+    // convert some common query string booleans/numbers if needed
     const queryFilters: any = { ...filters };
-    if (status) {
-      queryFilters.status = status;
-    }
+    if (queryFilters.isApproved === 'true') queryFilters.isApproved = true;
+    if (queryFilters.isApproved === 'false') queryFilters.isApproved = false;
 
     const [jobs, total] = await Promise.all([
       jobService.getJobs({
@@ -271,6 +272,8 @@ export const adminGetAllJobs: AuthenticatedHandler = async (req, res, next) => {
     next(error);
   }
 };
+
+// ...existing code...
 
 export const getRecruiterJobs: AuthenticatedHandler = async (req, res, next) => {
   try {

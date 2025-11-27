@@ -2,32 +2,41 @@
 import { Request, Response } from "express";
 import * as authService from "../services/authService";
 import { User } from "../models/User";
-
 import { CandidateProfile } from "../../profile/candidate/models/CandidateProfile";
-// Employer related code removed
 import { RecruiterProfile } from "../../profile/recruiter/models/RecruiterProfile";
 import { AdminProfile } from "../../profile/admin/models/AdminProfile";
 
-// Token expiration times
-const ACCESS_TTL = "24h";  // Increased from 15m to 24h
-const REFRESH_TTL = "30d"; // Increased from 7d to 30d
+const ACCESS_TTL = "24h";
+const REFRESH_TTL = "30d";
 const REFRESH_COOKIE_NAME = "refreshToken";
 const REFRESH_COOKIE_MAXAGE = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 
 export const register = async (req: Request, res: Response) => {
-  const { name, email, password, role, phone, designation, agency, skills } = req.body;
-
-  // FIX: accept both companyName and companyId
-  const company = req.body.company || req.body.companyId;
-
   try {
-    const user = await authService.registerUser(name, email, password, role);
-    const userId = (user as any)._id.toString();
+    const { name, email, password, role, phone, designation, agency, skills } = req.body;
 
-    // Auto-create profile
+    // Required field validation
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email, and password are required"
+      });
+    }
+
+    // Create user
+    const user = await authService.registerUser(name, email, password, role as any);
+
+    // Create corresponding profile based on role
+    const userId = user._id.toString();
+    
     switch (role) {
       case "candidate":
-        if (!phone) throw new Error("Phone is required for candidate");
+        if (!phone) {
+          return res.status(400).json({
+            success: false,
+            message: "Phone number is required for candidate registration"
+          });
+        }
         await CandidateProfile.create({
           user: userId,
           name,
@@ -36,12 +45,13 @@ export const register = async (req: Request, res: Response) => {
         });
         break;
 
-      // Employer registration removed
-
       case "recruiter":
-        if (!phone || !designation || !agency)
-          throw new Error("Phone, designation and agency are required for recruiter");
-
+        if (!phone || !designation || !agency) {
+          return res.status(400).json({
+            success: false,
+            message: "Phone, designation, and agency are required for recruiter registration"
+          });
+        }
         await RecruiterProfile.create({
           user: userId,
           name,
@@ -52,7 +62,12 @@ export const register = async (req: Request, res: Response) => {
         break;
 
       case "admin":
-        if (!phone) throw new Error("Phone is required for admin");
+        if (!phone) {
+          return res.status(400).json({
+            success: false,
+            message: "Phone number is required for admin registration"
+          });
+        }
         await AdminProfile.create({
           user: userId,
           name,
@@ -63,64 +78,17 @@ export const register = async (req: Request, res: Response) => {
         break;
 
       default:
-        throw new Error("Invalid role");
+        return res.status(400).json({
+          success: false,
+          message: "Invalid role specified"
+        });
     }
 
-    const accessToken = authService.signToken({ id: userId, role }, "15m");
-    const refreshToken = authService.signToken({ id: userId }, "7d");
+    // Generate tokens
+    const accessToken = authService.signToken({ id: userId, role: user.role, email: user.email }, ACCESS_TTL);
+    const refreshToken = authService.signToken({ id: userId }, REFRESH_TTL);
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    res.status(201).json({
-      success: true,
-      data: { user, accessToken, refreshToken }
-    });
-
-  } catch (err: any) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-};
-
-export const login = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-  try {
-    if (!email || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email and password are required' 
-      });
-    }
-
-    const { user } = await authService.loginUser(email, password);
-    const userId = (user as any)._id.toString();
-    const userRole = (user as any).role || 'user';
-    
-    // Include the role in both access and refresh tokens
-    const accessToken = authService.signToken({ 
-      id: userId, 
-      role: userRole,
-      email: user.email
-    }, ACCESS_TTL);
-    
-    const refreshToken = authService.signToken({ 
-      id: userId,
-      role: userRole
-    }, REFRESH_TTL);
-
-    // Remove sensitive data from user object
-    const userResponse = {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      // Add other non-sensitive fields as needed
-    };
-
+    // Set refresh token cookie
     res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -128,103 +96,221 @@ export const login = async (req: Request, res: Response) => {
       maxAge: REFRESH_COOKIE_MAXAGE
     });
 
-    res.status(200).json({ 
-      success: true, 
-      data: { 
-        user: userResponse, 
-        accessToken, 
-        refreshToken 
-      } 
+    res.status(201).json({
+      success: true,
+      data: {
+        user,
+        accessToken,
+        refreshToken
+      }
     });
-  } catch (err: any) {
-    console.error("Login error:", err);
-    res.status(400).json({ 
-      success: false, 
-      message: err.message || "Login failed. Please check your credentials." 
+
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || "Registration failed"
+    });
+  }
+};
+
+export const login = async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required"
+      });
+    }
+
+    // Authenticate user
+    const { user } = await authService.loginUser(email, password);
+    const userId = user._id.toString();
+
+    // Generate tokens
+    const accessToken = authService.signToken(
+      { id: userId, role: user.role, email: user.email },
+      ACCESS_TTL
+    );
+
+    const refreshToken = authService.signToken({ id: userId }, REFRESH_TTL);
+
+    // Set refresh token cookie
+    res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: REFRESH_COOKIE_MAXAGE
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user,
+        accessToken,
+        refreshToken
+      }
+    });
+
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message: error.message || "Login failed. Please check your credentials."
     });
   }
 };
 
 export const refresh = async (req: Request, res: Response) => {
   try {
-    const token = req.cookies?.[REFRESH_COOKIE_NAME] ?? req.body?.refreshToken;
-    if (!token) return res.status(401).json({ success: false, message: "Refresh token missing" });
+    const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME] || req.body.refreshToken;
 
-    const decoded: any = authService.verifyToken(token);
-    const userId = decoded?.id ?? decoded?.sub;
-    if (!userId) return res.status(401).json({ success: false, message: "Invalid token payload" });
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Refresh token is required"
+      });
+    }
 
-    const user = await User.findById(userId).lean().exec();
-    if (!user) return res.status(401).json({ success: false, message: "User not found" });
+    const decoded: any = authService.verifyToken(refreshToken);
+    const userId = decoded.id;
 
-    const accessToken = authService.signToken({ id: userId, role: (user as any).role }, ACCESS_TTL);
-    const refreshToken = authService.signToken({ id: userId }, REFRESH_TTL);
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid refresh token"
+      });
+    }
 
-    res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Generate new tokens
+    const newAccessToken = authService.signToken(
+      { id: userId, role: user.role, email: user.email },
+      ACCESS_TTL
+    );
+
+    const newRefreshToken = authService.signToken({ id: userId }, REFRESH_TTL);
+
+    // Update refresh token cookie
+    res.cookie(REFRESH_COOKIE_NAME, newRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: REFRESH_COOKIE_MAXAGE
     });
 
-    res.status(200).json({ success: true, data: { accessToken, refreshToken } });
-  } catch (err: any) {
-    res.status(401).json({ success: false, message: "Invalid refresh token" });
+    res.status(200).json({
+      success: true,
+      data: {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken
+      }
+    });
+
+  } catch (error: any) {
+    res.status(401).json({
+      success: false,
+      message: "Invalid refresh token"
+    });
   }
 };
 
-
 export const logout = async (req: Request, res: Response) => {
-  res.clearCookie(REFRESH_COOKIE_NAME, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-  });
-  res.status(200).json({ success: true, message: "Logged out" });
-};
+  try {
+    // Clear the refresh token cookie
+    res.clearCookie(REFRESH_COOKIE_NAME, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax"
+    });
 
+    res.status(200).json({
+      success: true,
+      message: "Successfully logged out"
+    });
+
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Logout failed"
+    });
+  }
+};
 
 export const me = async (req: Request, res: Response) => {
   try {
-    const authHeader = (req.headers.authorization as string) || "";
-    const token =
-      authHeader.startsWith("Bearer ") ? authHeader.slice(7) :
-      req.cookies?.[REFRESH_COOKIE_NAME] ?? req.body?.refreshToken;
+    const authHeader = req.headers.authorization;
+    let token: string | undefined;
 
-    if (!token) return res.status(401).json({ success: false, message: "Access token missing" });
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.substring(7);
+    } else if (req.cookies?.[REFRESH_COOKIE_NAME]) {
+      token = req.cookies[REFRESH_COOKIE_NAME];
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication token is required"
+      });
+    }
 
     const decoded: any = authService.verifyToken(token);
-    const userId = decoded?.id ?? decoded?.sub;
-    if (!userId) return res.status(401).json({ success: false, message: "Invalid token payload" });
+    const userId = decoded.id;
 
-    const user = await User.findById(userId).lean().exec();
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token"
+      });
+    }
+
+    const user = await User.findById(userId).lean();
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
 
     let profile: any = null;
-    switch ((user as any).role) {
+
+    switch (user.role) {
       case "candidate":
-        profile = await CandidateProfile.findOne({ user: userId }).lean().exec();
+        profile = await CandidateProfile.findOne({ user: userId }).lean();
         break;
       case "recruiter":
-        profile = await RecruiterProfile.findOne({ user: userId }).lean().exec();
+        profile = await RecruiterProfile.findOne({ user: userId }).lean();
         break;
       case "admin":
-        profile = await AdminProfile.findOne({ user: userId }).lean().exec();
+        profile = await AdminProfile.findOne({ user: userId }).lean();
         break;
-      default:
-        profile = null;
     }
 
     const userResponse = {
       id: user._id,
       name: user.name,
       email: user.email,
-      role: (user as any).role,
-      profile,
+      role: user.role,
+      profile
     };
 
-    res.status(200).json({ success: true, data: userResponse });
-  } catch (err: any) {
-    res.status(401).json({ success: false, message: err.message || "Invalid token" });
+    res.status(200).json({
+      success: true,
+      data: userResponse
+    });
+
+  } catch (error: any) {
+    res.status(401).json({
+      success: false,
+      message: error.message || "Invalid or expired token"
+    });
   }
 };

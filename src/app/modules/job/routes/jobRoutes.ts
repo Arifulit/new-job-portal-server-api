@@ -46,6 +46,7 @@ router.get(
 
 router.get('/all', authMiddleware(["admin", "recruiter"]) as RequestHandler, handleRoute(adminGetAllJobs));
 // Job applications routes
+// router.get("/admin/jobs/all", authMiddleware(["admin"]) as RequestHandler, handleRoute(adminGetAllJobs));
 
 router.get(
   "/:id",
