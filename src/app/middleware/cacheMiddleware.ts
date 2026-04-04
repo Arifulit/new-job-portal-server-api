@@ -20,10 +20,13 @@ const ensureRedisConnection = async () => {
   }
 
   if (!connectPromise) {
-    connectPromise = client.connect().catch((error) => {
-      console.error('Redis connection error:', error);
-      throw error;
-    });
+    connectPromise = client
+      .connect()
+      .then(() => undefined)
+      .catch((error) => {
+        console.error('Redis connection error:', error);
+        throw error;
+      });
   }
 
   await connectPromise;
