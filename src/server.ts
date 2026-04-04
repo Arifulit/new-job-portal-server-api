@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { createServer, Server } from "http";
 import mongoose from "mongoose";
 import { env } from "./app/config/env";
