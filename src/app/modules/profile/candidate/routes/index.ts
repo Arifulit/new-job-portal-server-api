@@ -1,7 +1,6 @@
 
 import { Router, Request, Response, NextFunction } from "express";
 import candidateProfileRoutes from "./candidateProfileRoutes";
-import resumeRoutes from "./resumeRoutes";
 import { 
   createCandidateProfileController, 
   getCurrentCandidateProfileController,
@@ -25,8 +24,14 @@ router.use((req: Request, res: Response, next: NextFunction) => {
 // This makes: GET /api/v1/candidate/profile, POST /api/v1/candidate/profile, GET /api/v1/candidate/profile/:userId, etc.
 router.use("/profile", candidateProfileRoutes);
 
-// Mount sub-routes
-router.use("/resume", resumeRoutes);
+// Resume upload depends on Cloudinary and is disabled on Vercel serverless.
+const isVercelDeployment = process.env.VERCEL === "1" || process.env.VERCEL === "true";
+if (!isVercelDeployment) {
+  // Lazy-load to keep the Cloudinary dependency out of the startup path.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const resumeRoutes = require("./resumeRoutes").default as Router;
+  router.use("/resume", resumeRoutes);
+}
 
 // Candidate dashboard stats
 router.get(
