@@ -12,13 +12,30 @@ const client = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379'
 });
 
-client.connect().catch(console.error);
+let connectPromise: Promise<void> | null = null;
+
+const ensureRedisConnection = async () => {
+  if (client.isOpen) {
+    return;
+  }
+
+  if (!connectPromise) {
+    connectPromise = client.connect().catch((error) => {
+      console.error('Redis connection error:', error);
+      throw error;
+    });
+  }
+
+  await connectPromise;
+};
 
 export const cacheMiddleware = (keyPrefix: string) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     const key = keyPrefix + req.originalUrl;
     
     try {
+      await ensureRedisConnection();
+
       // Try to get data from cache
       const cachedData = await client.get(key);
       
