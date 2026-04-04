@@ -12,7 +12,7 @@ import {
   getApprovedJobs
 } from "../controllers/jobController";
 import { getJobApplications } from "../../application/controllers/applicationController";
-import { authMiddleware } from "../../../middleware/auth";
+import { authMiddleware, optionalAuth } from "../../../middleware/auth";
 import adminJobRoutes from "./adminJobRoutes";
 import { adminGetAllJobs } from "../controllers/jobAdminController";
 
@@ -40,11 +40,13 @@ const handleRoute = (
 // Protected routes
 router.get(
   "/",
+  optionalAuth,
   handleRoute(getAllJobs)
 );
 
 router.get(
   "/search",
+  optionalAuth,
   handleRoute(getAllJobs)
 );
 
@@ -54,6 +56,7 @@ router.get('/all', authMiddleware(["admin", "recruiter"]) as RequestHandler, han
 
 router.get(
   "/:id",
+  optionalAuth,
   handleRoute(getJobById)
 );
 

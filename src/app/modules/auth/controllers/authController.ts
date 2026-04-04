@@ -54,6 +54,8 @@ export const register = async (req: Request, res: Response) => {
       industryType,
       websiteUrl,
       skills,
+      biodata,
+      location,
     } = req.body;
 
     // Required field validation
@@ -81,16 +83,19 @@ export const register = async (req: Request, res: Response) => {
 
     switch (role) {
       case "candidate":
-        if (!phone) {
+        if (!phone || !biodata || !location) {
           return res.status(400).json({
             success: false,
-            message: "Phone number is required for candidate registration",
+            message:
+              "Phone number, biodata and location are required for candidate registration",
           });
         }
         await CandidateProfile.create({
           user: userId,
           name,
           phone,
+          bio: String(biodata).trim(),
+          address: String(location).trim(),
           skills: skills || [],
         });
         break;
@@ -98,6 +103,8 @@ export const register = async (req: Request, res: Response) => {
       case "recruiter": {
         if (
           !phone ||
+          !biodata ||
+          !location ||
           !designation ||
           !companyName ||
           !yearOfEstablishment ||
@@ -108,7 +115,7 @@ export const register = async (req: Request, res: Response) => {
           return res.status(400).json({
             success: false,
             message:
-              "Phone, designation, companyName, yearOfEstablishment, companyAddress, industryType and websiteUrl are required for recruiter registration",
+              "Phone, biodata, location, designation, companyName, yearOfEstablishment, companyAddress, industryType and websiteUrl are required for recruiter registration",
           });
         }
 
@@ -151,6 +158,8 @@ export const register = async (req: Request, res: Response) => {
           user: userId,
           phone,
           designation,
+          bio: String(biodata).trim(),
+          location: String(location).trim(),
           agency: agencyId,
           company: companyDoc._id,
         });
@@ -158,10 +167,11 @@ export const register = async (req: Request, res: Response) => {
       }
 
       case "admin":
-        if (!phone) {
+        if (!phone || !biodata || !location) {
           return res.status(400).json({
             success: false,
-            message: "Phone number is required for admin registration",
+            message:
+              "Phone number, biodata and location are required for admin registration",
           });
         }
         await AdminProfile.create({
@@ -169,6 +179,8 @@ export const register = async (req: Request, res: Response) => {
           name,
           email,
           phone,
+          biodata: String(biodata).trim(),
+          location: String(location).trim(),
           role: "Admin",
         });
         break;

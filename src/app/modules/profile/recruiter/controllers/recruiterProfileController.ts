@@ -1,6 +1,16 @@
 import { Request, Response } from "express";
 import * as recruiterProfileService from "../services/recruiterProfileService";
 
+const formatRecruiterProfileResponse = (profile: any) => {
+  if (!profile) return profile;
+
+  return {
+    ...profile,
+    biodata: profile.biodata ?? profile.bio ?? "",
+    location: profile.location ?? "",
+  };
+};
+
 export const createRecruiterProfileController = async (req: Request, res: Response) => {
   try {
     // Add the user ID from the authenticated request to the profile data
@@ -9,7 +19,7 @@ export const createRecruiterProfileController = async (req: Request, res: Respon
       user: req.user?.id
     };
     const profile = await recruiterProfileService.createRecruiterProfile(profileData);
-    res.status(201).json({ success: true, data: profile });
+    res.status(201).json({ success: true, data: formatRecruiterProfileResponse(profile) });
   } catch (error) {
     console.error('Error creating recruiter profile:', error);
     res.status(500).json({ success: false, message: 'Error creating recruiter profile' });
@@ -50,7 +60,7 @@ export const getRecruiterProfileController = async (req: Request, res: Response)
     return res.status(200).json({ 
       success: true, 
       message: "Recruiter profile retrieved successfully",
-      data: profile 
+      data: formatRecruiterProfileResponse(profile)
     });
     
   } catch (error: any) {
@@ -118,7 +128,7 @@ export const updateRecruiterProfileController = async (req: Request, res: Respon
     res.status(200).json({ 
       success: true, 
       message: 'Profile updated successfully',
-      data: updatedProfile 
+      data: formatRecruiterProfileResponse(updatedProfile)
     });
 
   } catch (error) {

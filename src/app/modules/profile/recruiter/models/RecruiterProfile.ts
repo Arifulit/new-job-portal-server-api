@@ -7,6 +7,7 @@ export interface IRecruiterProfile {
   designation: string;
   phone: string;
   bio?: string;
+  location?: string;
 }
 
 const recruiterProfileSchema = new Schema<IRecruiterProfile>({
@@ -16,6 +17,7 @@ const recruiterProfileSchema = new Schema<IRecruiterProfile>({
   designation: { type: String, required: true },
   phone: { type: String, required: true },
   bio: { type: String, trim: true },
+  location: { type: String, trim: true, default: "" },
 }, { timestamps: true });
 
 export const RecruiterProfile = model<IRecruiterProfile>("RecruiterProfile", recruiterProfileSchema);

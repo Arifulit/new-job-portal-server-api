@@ -10,6 +10,7 @@ export interface IStatusHistory {
 export interface IJobUpdateData {
   title?: string;
   description?: string;
+  responsibilities?: string[];
   requirements?: string[];
   location?: string;
   jobType?: string;
@@ -36,6 +37,7 @@ export interface IJobUpdateData {
 export interface IJob extends Document {
   title: string;
   description: string;
+  responsibilities?: string[];
   requirements: string[];
   location: string;
   jobType: string;
@@ -67,6 +69,7 @@ export interface IJob extends Document {
 const jobSchema = new Schema<IJob>({
   title: { type: String, required: true },
   description: { type: String, required: true },
+  responsibilities: [{ type: String }],
   requirements: [{ type: String }],
   location: { type: String, required: true },
   jobType: { 
@@ -142,11 +145,13 @@ const jobSchema = new Schema<IJob>({
 jobSchema.index({
   title: 'text',
   description: 'text',
+  responsibilities: 'text',
   requirements: 'text',
   skills: 'text'
 }, {
   weights: {
     title: 10,
+    responsibilities: 7,
     requirements: 5,
     skills: 3,
     description: 1

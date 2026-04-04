@@ -6,6 +6,8 @@ export interface IAdminProfile {
   email: string;
   password: string;
   phone?: string;
+  biodata?: string;
+  location?: string;
   avatar?: string;
   role: "Admin";
   comparePassword?: (candidatePassword: string) => Promise<boolean>;
@@ -46,6 +48,16 @@ const adminProfileSchema = new Schema<IAdminProfile>({
     immutable: true
   },
   phone: {
+    type: String,
+    trim: true,
+    default: ""
+  },
+  biodata: {
+    type: String,
+    trim: true,
+    default: ""
+  },
+  location: {
     type: String,
     trim: true,
     default: ""

@@ -178,7 +178,7 @@ export const optionalAuth: RequestHandler = (req, res, next) => {
     req.user = {
       id: decoded.id,
       email: decoded.email || '',
-      role: (decoded.role || 'user').toLowerCase().trim(),
+      role: normalizeRole(decoded.role || decoded?.user?.role),
       ...decoded
     };
     authDebugLog("🔐 Optional auth - Authenticated user:", req.user?.id);

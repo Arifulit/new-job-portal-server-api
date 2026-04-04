@@ -29,8 +29,18 @@ export const uploadResume = async (data: any) => {
     }
     
     console.log("📝 Service: Processed resume data:", data);
-    const resume = await Resume.create(data);
-    console.log("✅ Service: Resume uploaded successfully:", resume._id);
+    const resume = await Resume.findOneAndUpdate(
+      { candidate: data.candidate },
+      {
+        $set: {
+          fileUrl: data.fileUrl,
+          fileName: data.fileName,
+          candidate: data.candidate,
+        },
+      },
+      { new: true, upsert: true, runValidators: true }
+    );
+    console.log("✅ Service: Resume uploaded successfully:", resume?._id);
     return resume;
   } catch (error: any) {
     console.error("❌ Service Error (upload resume):", error.message);

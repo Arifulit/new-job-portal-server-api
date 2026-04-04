@@ -3,6 +3,7 @@ import { AuthenticatedRequest } from "@/types/express";
 import * as adminService from "../services/adminProfileService";
 import bcrypt from "bcryptjs";
 import { AdminProfile } from "../models/AdminProfile";
+import { User } from "../../../auth/models/User";
 
 const toIdString = (value: unknown): string => {
   if (!value) return "";
@@ -192,6 +193,17 @@ export const updateAdminController = async (req: AuthenticatedRequest, res: Resp
     }
 
     const updateData = { ...req.body };
+    const normalizedBiodata = updateData.biodata ?? updateData.bio;
+    const normalizedLocation = updateData.location ?? updateData.address;
+
+    if (updateData.name !== undefined || updateData.email !== undefined) {
+      const userUpdates: Record<string, string> = {};
+      if (typeof updateData.name === 'string') userUpdates.name = updateData.name.trim();
+      if (typeof updateData.email === 'string') userUpdates.email = updateData.email.trim().toLowerCase();
+      if (Object.keys(userUpdates).length > 0) {
+        await User.findByIdAndUpdate(adminId, { $set: userUpdates }, { new: false });
+      }
+    }
 
     // Find the admin
     let admin = await AdminProfile.findOne({
@@ -214,17 +226,32 @@ export const updateAdminController = async (req: AuthenticatedRequest, res: Resp
       admin = new AdminProfile({
         user: adminId,
         name: updateData.name,
-        email: updateData.email || req.user.email,
+        email: (updateData.email || req.user.email || '').toLowerCase(),
         role: 'Admin',
-        ...(updateData.phone && { phone: updateData.phone })
+        ...(updateData.phone !== undefined && { phone: updateData.phone }),
+        ...(normalizedBiodata !== undefined && { biodata: normalizedBiodata }),
+        ...(normalizedLocation !== undefined && { location: normalizedLocation }),
+        ...(updateData.avatar !== undefined && { avatar: updateData.avatar })
       });
     } else {
-      // For existing admin, update only provided fields except email and role
+      // Role is immutable by schema; keep profile fields editable.
       if (updateData.name !== undefined) {
         admin.name = updateData.name;
       }
+      if (updateData.email !== undefined) {
+        admin.email = String(updateData.email).toLowerCase();
+      }
       if (updateData.phone !== undefined) {
         admin.phone = updateData.phone;
+      }
+      if (normalizedBiodata !== undefined) {
+        (admin as any).biodata = normalizedBiodata;
+      }
+      if (normalizedLocation !== undefined) {
+        (admin as any).location = normalizedLocation;
+      }
+      if (updateData.avatar !== undefined) {
+        admin.avatar = updateData.avatar;
       }
     }
 

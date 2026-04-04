@@ -1,6 +1,47 @@
 import { Request, Response } from "express";
 import * as candidateProfileService from "../services/candidateProfileService";
 import { CandidateProfile } from "../models/CandidateProfile";
+import { User } from "../../../auth/models/User";
+
+const buildCandidateUpdatePayload = (body: Record<string, any>) => {
+  const payload = { ...body };
+
+  if (payload.biodata !== undefined && payload.bio === undefined) {
+    payload.bio = payload.biodata;
+  }
+
+  if (payload.location !== undefined && payload.address === undefined) {
+    payload.address = payload.location;
+  }
+
+  delete payload.biodata;
+  delete payload.location;
+  delete payload.role;
+  delete payload.user;
+
+  return payload;
+};
+
+const formatCandidateProfileResponse = (profile: any) => {
+  if (!profile) return profile;
+
+  const userProfile =
+    profile.user && typeof profile.user === "object" ? profile.user : undefined;
+
+  return {
+    ...profile,
+    name: profile.name ?? userProfile?.name ?? "",
+    email: profile.email ?? userProfile?.email ?? "",
+    phone: profile.phone ?? "",
+    bio: profile.bio ?? profile.biodata ?? "",
+    biodata: profile.biodata ?? profile.bio ?? "",
+    address: profile.address ?? profile.location ?? "",
+    location: profile.location ?? profile.address ?? "",
+    skills: Array.isArray(profile.skills) ? profile.skills : [],
+    experience: Array.isArray(profile.experience) ? profile.experience : [],
+    education: Array.isArray(profile.education) ? profile.education : [],
+  };
+};
 
 const getAuthUserId = (req: Request): string => {
   const user = (req as any).user;
@@ -50,10 +91,13 @@ export const createCandidateProfileController = async (req: Request, res: Respon
       { user: userId },
       profileData,
       { new: true, upsert: true, runValidators: true }
-    ).populate("resume").lean();
+    )
+      .populate("resume")
+      .populate({ path: "user", select: "-password -__v" })
+      .lean();
     
     console.log("✅ Controller: Profile created/updated successfully");
-    res.status(201).json({ success: true, data: profile });
+    res.status(201).json({ success: true, data: formatCandidateProfileResponse(profile) });
   } catch (error: any) {
     console.error("❌ Controller Error (create):", error.message);
     
@@ -122,7 +166,7 @@ export const getCurrentCandidateProfileController = async (req: Request, res: Re
         success: true,
         isNew: true,
         message: "Profile initialized successfully. Please update your details.",
-        data: profile
+        data: formatCandidateProfileResponse(profile)
       });
     }
 
@@ -130,7 +174,7 @@ export const getCurrentCandidateProfileController = async (req: Request, res: Re
     return res.status(200).json({ 
       success: true, 
       message: "Candidate profile retrieved successfully",
-      data: profile 
+      data: formatCandidateProfileResponse(profile)
     });
     
   } catch (error: any) {
@@ -175,7 +219,7 @@ export const getCandidateProfileController = async (req: Request, res: Response)
     }
     
     console.log("✅ Controller: Profile retrieved successfully");
-    res.status(200).json({ success: true, data: profile });
+    res.status(200).json({ success: true, data: formatCandidateProfileResponse(profile) });
   } catch (error: any) {
     console.error("❌ Controller Error (get):", error.message);
     res.status(500).json({ 
@@ -189,7 +233,8 @@ export const updateCurrentCandidateProfileController = async (req: Request, res:
   try {
     console.log("🟦 Controller: Updating/Creating current candidate profile");
     console.log("🟦 User from request:", req.user);
-    console.log("🟦 Update data:", req.body);
+    const updatePayload = buildCandidateUpdatePayload(req.body || {});
+    console.log("🟦 Update data:", updatePayload);
     
     // Check if user is authenticated
     if (!req.user?.id) {
@@ -211,15 +256,15 @@ export const updateCurrentCandidateProfileController = async (req: Request, res:
       console.log("ℹ️  Profile doesn't exist, creating new one");
       const profileData = {
         user: userId,
-        name: req.body.name || "",
-        phone: req.body.phone || "",
-        address: req.body.address || "",
-        bio: req.body.bio || "",
+        name: updatePayload.name || "",
+        phone: updatePayload.phone || "",
+        address: updatePayload.address || "",
+        bio: updatePayload.bio || "",
         email: req.user.email || "", 
-        skills: req.body.skills || [],
-        experience: req.body.experience || [],
-        education: req.body.education || [],
-        ...req.body // Spread any other valid fields from the request
+        skills: updatePayload.skills || [],
+        experience: updatePayload.experience || [],
+        education: updatePayload.education || [],
+        ...updatePayload
       };
       
       profile = await candidateProfileService.createCandidateProfile(profileData);
@@ -227,13 +272,22 @@ export const updateCurrentCandidateProfileController = async (req: Request, res:
       return res.status(201).json({
         success: true,
         message: "Profile created successfully",
-        data: profile
+        data: formatCandidateProfileResponse(profile)
       });
     }
     
     // If profile exists, update it
     console.log("ℹ️  Updating existing profile");
-    await candidateProfileService.updateCandidateProfile(userId, req.body);
+    await candidateProfileService.updateCandidateProfile(userId, updatePayload);
+
+    if (updatePayload.name !== undefined || updatePayload.email !== undefined) {
+      const userUpdates: Record<string, string> = {};
+      if (typeof updatePayload.name === "string") userUpdates.name = updatePayload.name.trim();
+      if (typeof updatePayload.email === "string") userUpdates.email = updatePayload.email.trim().toLowerCase();
+      if (Object.keys(userUpdates).length > 0) {
+        await User.findByIdAndUpdate(userId, { $set: userUpdates }, { new: false });
+      }
+    }
     
     // Get the updated profile
     const updatedProfile = await candidateProfileService.getCandidateProfile(userId);
@@ -242,7 +296,7 @@ export const updateCurrentCandidateProfileController = async (req: Request, res:
     return res.status(200).json({ 
       success: true, 
       message: "Profile updated successfully",
-      data: updatedProfile 
+      data: formatCandidateProfileResponse(updatedProfile)
     });
   } catch (error: any) {
     console.error("❌ Controller Error (updateCurrentCandidateProfile):", error.message);
@@ -267,12 +321,22 @@ export const updateCandidateProfileController = async (req: Request, res: Respon
   try {
     console.log("🟦 Controller: Updating profile");
     console.log("🟦 UserId param:", req.params.userId);
-    console.log("🟦 Update data:", req.body);
+    const updatePayload = buildCandidateUpdatePayload(req.body || {});
+    console.log("🟦 Update data:", updatePayload);
     
     await candidateProfileService.updateCandidateProfile(
       req.params.userId,
-      req.body
+      updatePayload
     );
+
+    if (updatePayload.name !== undefined || updatePayload.email !== undefined) {
+      const userUpdates: Record<string, string> = {};
+      if (typeof updatePayload.name === "string") userUpdates.name = updatePayload.name.trim();
+      if (typeof updatePayload.email === "string") userUpdates.email = updatePayload.email.trim().toLowerCase();
+      if (Object.keys(userUpdates).length > 0) {
+        await User.findByIdAndUpdate(req.params.userId, { $set: userUpdates }, { new: false });
+      }
+    }
     
     const profile = (await candidateProfileService.getCandidateProfile(req.params.userId)) as any;
     
@@ -285,7 +349,7 @@ export const updateCandidateProfileController = async (req: Request, res: Respon
     }
     
     console.log("✅ Controller: Profile updated successfully");
-    res.status(200).json({ success: true, data: profile });
+    res.status(200).json({ success: true, data: formatCandidateProfileResponse(profile) });
   } catch (error: any) {
     console.error("❌ Controller Error (update):", error.message);
     

@@ -171,7 +171,32 @@ export const getJobById = async (
       });
     }
 
-    // Allow all authenticated users to view job details
+    const userRole = req.user?.role;
+    const authUserId = getAuthUserId(req.user);
+
+    if (userRole === "recruiter") {
+      const creatorId = toIdString((job as any).createdBy);
+      const isOwner = Boolean(authUserId && creatorId && creatorId === authUserId);
+
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          message: "Recruiters can only view jobs they posted",
+        });
+      }
+    }
+
+    // Guests and candidates should only see approved jobs.
+    if (!req.user || userRole === "candidate") {
+      if ((job as any).status !== "approved" || !(job as any).isApproved) {
+        return res.status(404).json({
+          success: false,
+          message: "Job not found",
+        });
+      }
+    }
+
+    // Admin can view every job; recruiter can view own jobs only.
     return res.status(200).json({
       success: true,
       data: job,
@@ -219,6 +244,122 @@ const validateJobInput = (
     return { isValid: false, message: "Location is required" };
   }
   return { isValid: true };
+};
+
+const normalizeResponsibilities = (value: unknown): string[] | undefined => {
+  if (Array.isArray(value)) {
+    const cleaned = value
+      .map((item) => String(item).trim())
+      .filter(Boolean);
+    return cleaned.length ? cleaned : undefined;
+  }
+
+  if (typeof value === "string") {
+    const cleaned = value
+      .split(/\r?\n|,/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return cleaned.length ? cleaned : undefined;
+  }
+
+  return undefined;
+};
+
+const normalizeRequirements = (value: unknown): string[] | undefined => {
+  if (Array.isArray(value)) {
+    const cleaned = value
+      .map((item) => String(item).trim())
+      .filter(Boolean);
+    return cleaned.length ? cleaned : undefined;
+  }
+
+  if (typeof value === "string") {
+    const cleaned = value
+      .split(/\r?\n|,/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return cleaned.length ? cleaned : undefined;
+  }
+
+  return undefined;
+};
+
+const normalizeJobUpdatePayload = (payload: Record<string, any>, isAdmin: boolean) => {
+  const normalizedPayload = { ...payload };
+
+  const normalizedResponsibilities = normalizeResponsibilities(
+    normalizedPayload.responsibilities ?? normalizedPayload.responsibility,
+  );
+
+  if (normalizedResponsibilities !== undefined) {
+    normalizedPayload.responsibilities = normalizedResponsibilities;
+  }
+
+  const normalizedRequirements = normalizeRequirements(
+    normalizedPayload.requirements ?? normalizedPayload.requirement,
+  );
+
+  if (normalizedRequirements !== undefined) {
+    normalizedPayload.requirements = normalizedRequirements;
+  }
+
+  if (normalizedPayload.type !== undefined && normalizedPayload.jobType === undefined) {
+    normalizedPayload.jobType = normalizedPayload.type;
+  }
+
+  if (
+    normalizedPayload.employmentType !== undefined &&
+    normalizedPayload.jobType === undefined
+  ) {
+    normalizedPayload.jobType = normalizedPayload.employmentType;
+  }
+
+  if (normalizedPayload.city !== undefined && normalizedPayload.location === undefined) {
+    normalizedPayload.location = normalizedPayload.city;
+  }
+
+  if (
+    normalizedPayload.experience !== undefined &&
+    normalizedPayload.experienceLevel === undefined
+  ) {
+    normalizedPayload.experienceLevel = inferExperienceLevel(normalizedPayload.experience);
+  }
+
+  if (normalizedPayload.salaryMin !== undefined && normalizedPayload.salary === undefined) {
+    normalizedPayload.salary = normalizedPayload.salaryMin;
+  }
+
+  if (normalizedPayload.salary !== undefined && normalizedPayload.salaryMin === undefined) {
+    normalizedPayload.salaryMin = normalizedPayload.salary;
+  }
+
+  delete normalizedPayload.type;
+  delete normalizedPayload.employmentType;
+  delete normalizedPayload.city;
+  delete normalizedPayload.responsibility;
+  delete normalizedPayload.requirement;
+
+  // Immutable/system-managed fields should never be overwritten directly.
+  delete normalizedPayload._id;
+  delete normalizedPayload.__v;
+  delete normalizedPayload.createdBy;
+  delete normalizedPayload.createdAt;
+  delete normalizedPayload.updatedAt;
+
+  if (!isAdmin) {
+    delete normalizedPayload.status;
+    delete normalizedPayload.isApproved;
+    delete normalizedPayload.rejectionReason;
+    delete normalizedPayload.statusHistory;
+    delete normalizedPayload.approvedAt;
+    delete normalizedPayload.approvedBy;
+    delete normalizedPayload.rejectedAt;
+    delete normalizedPayload.rejectedBy;
+    delete normalizedPayload.closedAt;
+    delete normalizedPayload.closedBy;
+  }
+
+  return normalizedPayload;
 };
 
 const inferExperienceLevel = (
@@ -322,6 +463,12 @@ export const createJob: AuthenticatedHandler = async (req, res, next) => {
     const jobData = {
       ...req.body,
       experienceLevel,
+      responsibilities: normalizeResponsibilities(
+        req.body.responsibilities ?? req.body.responsibility,
+      ),
+      requirements: normalizeRequirements(
+        req.body.requirements ?? req.body.requirement,
+      ),
       createdBy: new Types.ObjectId(req.user.id),
       status: autoApproveJob ? "approved" : "pending",
       isApproved: autoApproveJob,
@@ -336,6 +483,9 @@ export const createJob: AuthenticatedHandler = async (req, res, next) => {
       deadline: req.body.deadline,
       vacancies: req.body.vacancies,
     };
+
+    delete (jobData as any).responsibility;
+  delete (jobData as any).requirement;
 
     const job = await jobService.createJob(jobData);
     return res.status(201).json({
@@ -382,13 +532,17 @@ export const updateJob: AuthenticatedHandler = async (req, res, next) => {
     }
 
     // Prepare update data
-    const updateData: IJobUpdateData = {
-      ...req.body,
-      // Prevent updating createdBy and timestamps through the API
-      createdBy: undefined,
-      createdAt: undefined,
-      updatedAt: undefined,
-    };
+    const updateData: IJobUpdateData = normalizeJobUpdatePayload(
+      req.body || {},
+      isAdmin,
+    );
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid update fields provided",
+      });
+    }
 
     // Validate the update data if needed
     if (
@@ -675,6 +829,24 @@ export const getAllJobs: AuthenticatedHandler = async (req, res, next) => {
     sort[String(sortBy)] = sortOrder === "asc" ? 1 : -1;
 
     const queryFilters = buildJobListFilters(req.query);
+    const authUserId = getAuthUserId(req.user);
+
+    if (req.user?.role === "recruiter") {
+      if (!authUserId || !Types.ObjectId.isValid(authUserId)) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid authenticated recruiter identity",
+        });
+      }
+
+      queryFilters.createdBy = new Types.ObjectId(authUserId);
+
+      // Recruiters should be able to query all of their own jobs, not only approved ones.
+      if (req.query.status === undefined && req.query.isApproved === undefined) {
+        delete queryFilters.status;
+        delete queryFilters.isApproved;
+      }
+    }
 
     const [jobs, total] = await Promise.all([
       jobService.getJobs({

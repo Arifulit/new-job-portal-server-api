@@ -12,22 +12,37 @@ export const createRecruiterProfile = async (data: CreateRecruiterProfileDTO) =>
 export const getRecruiterProfile = async (userId: string) => {
   return await RecruiterProfile.findOne({ user: userId })
     .populate("user", "name email role")
-    .populate("agency", "name")
-    .select("user agency company designation phone bio createdAt updatedAt")
+    .populate("agency")
+    .populate("company")
     .lean();
 };
 
 export const updateRecruiterProfile = async (userId: string, data: any) => {
-  const { name, ...rest } = data || {};
+  const { name, email, ...rest } = data || {};
 
-  // Name is stored in User model, so update it separately.
+  // Name/email are stored in User model, so update those separately.
+  const userUpdates: Record<string, string> = {};
   if (typeof name === "string" && name.trim()) {
-    await User.findByIdAndUpdate(userId, { $set: { name: name.trim() } }, { new: false });
+    userUpdates.name = name.trim();
+  }
+  if (typeof email === "string" && email.trim()) {
+    userUpdates.email = email.trim().toLowerCase();
+  }
+  if (Object.keys(userUpdates).length > 0) {
+    await User.findByIdAndUpdate(userId, { $set: userUpdates }, { new: false });
   }
 
-  const allowedProfileFields = ["phone", "designation", "agency", "bio"];
+  const normalizedRest = { ...rest } as any;
+  if (normalizedRest.biodata !== undefined && normalizedRest.bio === undefined) {
+    normalizedRest.bio = normalizedRest.biodata;
+  }
+  delete normalizedRest.biodata;
+  delete normalizedRest.role;
+  delete normalizedRest.user;
+
+  const allowedProfileFields = ["phone", "designation", "agency", "company", "bio", "location"];
   const profileUpdates = Object.fromEntries(
-    Object.entries(rest).filter(([key, value]) => allowedProfileFields.includes(key) && value !== undefined)
+    Object.entries(normalizedRest).filter(([key, value]) => allowedProfileFields.includes(key) && value !== undefined)
   );
 
   const profile = await RecruiterProfile.findOneAndUpdate(
@@ -36,7 +51,8 @@ export const updateRecruiterProfile = async (userId: string, data: any) => {
     { new: true, runValidators: true }
   )
   .populate('user', 'name email role')
-  .populate('agency', 'name')
+  .populate('agency')
+  .populate('company')
   .lean();
   
   if (!profile) {

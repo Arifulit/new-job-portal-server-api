@@ -3,12 +3,23 @@ import fs from "fs";
 import cloudinary from "../../../../config/cloudinary";
 import * as resumeService from "../services/resumeService";
 
-function buildSignedCloudinaryUrlFromPublicId(publicId: string): string {
+function buildCloudinaryUrlFromPublicId(publicId: string, format?: string): string {
   return cloudinary.url(publicId, {
     secure: true,
     resource_type: "raw",
     type: "upload",
-    sign_url: true,
+    format,
+  });
+}
+
+function buildCloudinarySignedDownloadUrl(publicId: string, format = "pdf"): string {
+  const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30; // 30 days
+
+  return cloudinary.utils.private_download_url(publicId, format, {
+    resource_type: "raw",
+    type: "upload",
+    expires_at: expiresAt,
+    attachment: false,
   });
 }
 
@@ -67,7 +78,17 @@ export const uploadResumeController = async (req: Request, res: Response) => {
     let fileName: string;
     
     // Check if file was uploaded via form-data (multer)
-    const uploadedFile = (req as any).file;
+    const singleUploadedFile = (req as any).file;
+    const uploadedFiles = (req as any).files as
+      | Record<string, Express.Multer.File[]>
+      | Express.Multer.File[]
+      | undefined;
+
+    const uploadedFile =
+      singleUploadedFile ||
+      (Array.isArray(uploadedFiles)
+        ? uploadedFiles[0]
+        : uploadedFiles?.resume?.[0] || uploadedFiles?.file?.[0]);
     if (uploadedFile) {
       // File was uploaded via multer — now push to Cloudinary
       console.log("🟦 File uploaded via multer, uploading to Cloudinary:", uploadedFile.path);
@@ -86,7 +107,8 @@ export const uploadResumeController = async (req: Request, res: Response) => {
         if (err) console.warn("⚠️ Could not delete temp file:", uploadedFile.path);
       });
 
-      fileUrl = buildSignedCloudinaryUrlFromPublicId(cloudResult.public_id);
+      // Use Cloudinary's secure delivery URL directly so it works in browsers.
+      fileUrl = cloudResult.secure_url || buildCloudinaryUrlFromPublicId(cloudResult.public_id, cloudResult.format);
       fileName = uploadedFile.originalname || uploadedFile.filename;
 
       console.log("🟦 Cloudinary URL:", fileUrl);
@@ -132,9 +154,19 @@ export const uploadResumeController = async (req: Request, res: Response) => {
     console.log("🟦 Resume data with candidate:", resumeData);
     
     const resume = await resumeService.uploadResume(resumeData);
+    const resumeObj: any = (resume as any).toObject ? (resume as any).toObject() : resume;
+
+    if (typeof resumeObj.fileUrl === "string" && resumeObj.fileUrl.includes("res.cloudinary.com")) {
+      resumeObj.fileUrl = fixMalformedCloudinaryPdfUrl(resumeObj.fileUrl);
+      const parsed = parseCloudinaryPublicIdAndFormat(resumeObj.fileUrl);
+      if (parsed?.publicId) {
+        resumeObj.fileUrl = buildCloudinarySignedDownloadUrl(parsed.publicId, parsed.format || "pdf");
+        resumeObj.publicFileUrl = buildCloudinaryUrlFromPublicId(parsed.publicId, parsed.format);
+      }
+    }
     
     console.log("✅ Controller: Resume uploaded successfully");
-    res.status(201).json({ success: true, data: resume });
+    res.status(201).json({ success: true, data: resumeObj });
   } catch (error: any) {
     console.error("❌ Controller Error (upload):", error.message);
     console.error("❌ Error name:", error.name);
@@ -213,7 +245,8 @@ export const getCurrentResumeController = async (req: Request, res: Response) =>
         resumeObj.fileUrl = fixMalformedCloudinaryPdfUrl(resumeObj.fileUrl);
         const parsed = parseCloudinaryPublicIdAndFormat(resumeObj.fileUrl);
         if (parsed?.publicId) {
-          resumeObj.fileUrl = buildSignedCloudinaryUrlFromPublicId(parsed.publicId);
+          resumeObj.fileUrl = buildCloudinarySignedDownloadUrl(parsed.publicId, parsed.format || "pdf");
+          resumeObj.publicFileUrl = buildCloudinaryUrlFromPublicId(parsed.publicId, parsed.format);
         }
       }
 
@@ -257,7 +290,8 @@ export const getResumeController = async (req: Request, res: Response) => {
       resumeObj.fileUrl = fixMalformedCloudinaryPdfUrl(resumeObj.fileUrl);
       const parsed = parseCloudinaryPublicIdAndFormat(resumeObj.fileUrl);
       if (parsed?.publicId) {
-        resumeObj.fileUrl = buildSignedCloudinaryUrlFromPublicId(parsed.publicId);
+        resumeObj.fileUrl = buildCloudinarySignedDownloadUrl(parsed.publicId, parsed.format || "pdf");
+        resumeObj.publicFileUrl = buildCloudinaryUrlFromPublicId(parsed.publicId, parsed.format);
       }
     }
     

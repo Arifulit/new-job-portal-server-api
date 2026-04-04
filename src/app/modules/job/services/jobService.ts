@@ -81,6 +81,7 @@ const buildJobQueryFilters = (
       $or: [
         { title: keywordRegex },
         { description: keywordRegex },
+        { responsibilities: keywordRegex },
         { requirements: keywordRegex },
         { skills: keywordRegex },
         { location: keywordRegex },
@@ -256,7 +257,9 @@ export const updateJob = async (id: string, data: IJobUpdateData) => {
         $currentDate: { updatedAt: true } // Ensure updatedAt is always updated
       },
       { new: true, runValidators: true }
-    ).populate("createdBy", "name email");
+    )
+      .populate("createdBy", "name email")
+      .populate("company", "name logo");
     
     if (!job) {
       throw new Error("Job not found");
