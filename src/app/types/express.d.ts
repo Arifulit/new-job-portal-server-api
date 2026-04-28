@@ -1,8 +1,15 @@
+// Strict request type for authenticated routes
+import { Request } from 'express';
+export interface AuthenticatedRequest extends Request {
+  user: User;
+}
 import { JwtPayload } from 'jsonwebtoken';
+
+export type UserRole = 'candidate' | 'recruiter' | 'admin';
 
 export interface User extends JwtPayload {
   id: string;
-  role: string;
+  role: UserRole;
   email: string;
 }
 

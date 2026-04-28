@@ -1,4 +1,5 @@
 import { Job } from "../../job/models/Job";
+import { Application } from "../../application/models/Application";
 import { Notification } from "../../notification/models/Notification";
 import { CandidateProfile } from "../../profile/candidate/models/CandidateProfile";
 import { Resume } from "../../profile/candidate/models/Resume";
@@ -16,10 +17,10 @@ export const getJobStats = async () => {
 
 // Application Stats
 export const getApplicationStats = async () => {
-  const totalApplications = await Application.countDocuments();
-  const pendingApplications = await Application.countDocuments({ status: "Pending" });
-  const acceptedApplications = await Application.countDocuments({ status: "Accepted" });
-  const rejectedApplications = await Application.countDocuments({ status: "Rejected" });
+	const totalApplications = await Application.countDocuments();
+	const pendingApplications = await Application.countDocuments({ status: "Applied" });
+	const acceptedApplications = await Application.countDocuments({ status: "Accepted" });
+	const rejectedApplications = await Application.countDocuments({ status: "Rejected" });
 
   return { totalApplications, pendingApplications, acceptedApplications, rejectedApplications };
 };

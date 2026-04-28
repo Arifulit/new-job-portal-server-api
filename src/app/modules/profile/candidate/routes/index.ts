@@ -35,6 +35,7 @@ if (!isVercelDeployment) {
 }
 
 // Candidate job list: GET /api/v1/candidate/jobs
+
 router.get(
   "/jobs",
   authMiddleware(["candidate", "admin"]),

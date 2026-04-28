@@ -19,7 +19,7 @@ import { getJobApplications } from "../../application/controllers/applicationCon
 import { authMiddleware, optionalAuth } from "../../../middleware/auth";
 import adminJobRoutes from "./adminJobRoutes";
 import { adminGetAllJobs } from "../controllers/jobAdminController";
-import { imageUpload } from "../../../middleware/upload";
+import { upload as imageUpload } from "../../../middleware/upload";
 
 const router = Router();
 

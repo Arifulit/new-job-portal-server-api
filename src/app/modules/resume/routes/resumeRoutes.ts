@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { resumeUpload } from "../../../middleware/upload";
-import pdfParse from "pdf-parse";
+const pdfParse = require("pdf-parse");
 import fs from "fs";
 import path from "path";
 import { analyzeResumeWithOpenAI } from "../../../integrations/openai/resumeParser";

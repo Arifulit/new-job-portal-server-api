@@ -38,6 +38,7 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
 };
 
 export const upload = multer({ storage, fileFilter });
+export const imageUpload = upload;
 
 const resumeFileFilter = (req: any, file: Express.Multer.File, cb: any) => {
   const isPdfMime = file.mimetype === "application/pdf";
