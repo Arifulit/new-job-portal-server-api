@@ -14,7 +14,11 @@ import messageRoutes from "../modules/message/routes/messageRoutes";
 import notificationRoutes from "../modules/notification/routes/notificationRoutes";
 import { authMiddleware } from "../middleware/auth";
 
+import careerResourcesRoutes from "../modules/careerResources/routes";
+import summaryStatsRoutes from "../modules/analytics/routes/summaryStatsRoutes";
+
 import resumeRoutes from "../modules/resume/routes/resumeRoutes";
+
 import {
   getAdminDashboardStatsController,
   getRoleBasedDashboardStatsController,
@@ -25,6 +29,11 @@ const router = Router();
 // Resume analyzer route
 router.use("/resume", resumeRoutes);
 
+// Public career resources
+router.use("/career-resources", careerResourcesRoutes);
+
+// Public summary stats
+router.use("/analytics", summaryStatsRoutes);
 
 router.use("/auth", authRoutes);
 
