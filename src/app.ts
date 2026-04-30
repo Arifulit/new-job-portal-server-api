@@ -13,8 +13,9 @@ import notFound from "./app/middleware/notFound";
 const app = express();
 
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Allow larger JSON payloads for AI and batch endpoints
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.set("trust proxy", 1);
 

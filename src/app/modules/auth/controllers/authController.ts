@@ -224,8 +224,9 @@ export const googleCallback = (req: Request, res: Response, next: NextFunction) 
 
     if (req.query.mode === "json") return res.status(200).json({ success: true, data: { user: toAuthUserPayload(user), accessToken, refreshToken } });
 
+    // Always redirect to root (/) with accessToken
     const frontendUrl = new URL(env.FRONTEND_URL);
-    frontendUrl.pathname = decodeOAuthRedirectState(req.query.state);
+    frontendUrl.pathname = "/";
     frontendUrl.searchParams.set("accessToken", accessToken);
     return res.redirect(frontendUrl.toString());
   })(req, res, next);

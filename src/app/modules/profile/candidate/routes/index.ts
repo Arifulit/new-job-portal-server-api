@@ -1,6 +1,8 @@
 
 import { Router, Request, Response, NextFunction } from "express";
 import candidateProfileRoutes from "./candidateProfileRoutes";
+import candidateRankingRoutes from "./candidateRankingRoutes";
+import candidateSkillGapRoutes from "./candidateSkillGapRoutes";
 import { 
   createCandidateProfileController, 
   getCurrentCandidateProfileController,
@@ -18,6 +20,11 @@ router.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`🔍 Candidate Routes - ${req.method} ${req.path} | Original: ${req.originalUrl} | Base: ${req.baseUrl}`);
   next();
 });
+
+// Mount candidate ranking API
+router.use("/candidates", candidateRankingRoutes);
+// Mount candidate skill-gap API
+router.use("/candidates", candidateSkillGapRoutes);
 
 // Mount profile sub-routes at /profile path
 // This makes: GET /api/v1/candidate/profile, POST /api/v1/candidate/profile, GET /api/v1/candidate/profile/:userId, etc.

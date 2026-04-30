@@ -4,14 +4,17 @@ import OpenAI from "openai";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+import { extractTextFromPdf } from "./pdfUtil";
 
-export async function analyzeResumeWithOpenAI(resumeText: string) {
+export async function analyzeResumeWithOpenAI(resumeFilePath: string) {
+  // Extract text from PDF
+  const resumeText = await extractTextFromPdf(resumeFilePath);
   // You can customize the prompt as needed
   const prompt = `Analyze the following resume text. Extract:
-- Skills
-- Score out of 100 (score)
-- Suggest missing skills for a backend engineer
-- Give improvement suggestions
+Skills
+Score out of 100 (score)
+Suggest missing skills for a backend engineer
+Give improvement suggestions
 
 Resume:
 ${resumeText}
