@@ -62,6 +62,13 @@ router.get(
   handleRoute(getApprovedJobs)
 );
 
+// Recruiter-specific jobs: individual recruiter can only see jobs they created
+router.get(
+  "/recruiter/jobs",
+  authMiddleware(["recruiter"]) as RequestHandler,
+  handleRoute(getAllJobs)
+);
+
 // Backward-compatible pagination alias:
 // GET /api/v1/jobs/page=1&limit=10
 router.get(

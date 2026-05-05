@@ -247,6 +247,19 @@ export const createCandidateProfileController = async (req: Request, res: Respon
       }
     }
 
+    // Handle resume URL from FormData body (when client sends pre-uploaded resume URL)
+    const resumeUrlFromBody = typeof req.body?.resume === 'string' ? req.body.resume.trim() : '';
+    if (resumeUrlFromBody && !uploadedResume) {
+      console.log("📤 Resume URL provided in body:", resumeUrlFromBody);
+      uploadedResume = {
+        fileUrl: resumeUrlFromBody,
+        fileName: 'resume.pdf'
+      };
+    } else if ('resume' in req.body && !resumeUrlFromBody) {
+      // If resume field exists but is empty, user wants to delete resume
+      console.log("🗑️  Resume deletion requested in create");
+    }
+
     console.log("🟦 User authenticated, userId:", userId);
     
     // Prepare profile data with authenticated user ID
@@ -282,6 +295,14 @@ export const createCandidateProfileController = async (req: Request, res: Respon
       const profileId = String((savedProfile as any)?._id || (profile as any)?._id || "");
       if (profileId) {
         await syncProfileResume(profileId, uploadedResume.fileUrl, uploadedResume.fileName);
+      }
+    } else if ('resume' in req.body && !resumeUrlFromBody) {
+      // Delete resume if empty string was provided
+      const savedProfile = await candidateProfileService.getCandidateProfile(userId);
+      const profileId = String((savedProfile as any)?._id || (profile as any)?._id || "");
+      if (profileId) {
+        await Resume.deleteOne({ candidate: profileId });
+        console.log("✅ Resume deleted successfully");
       }
     }
 
@@ -458,6 +479,19 @@ export const updateCurrentCandidateProfileController = async (req: Request, res:
       }
     }
 
+    // Handle resume URL from FormData body (when client sends pre-uploaded resume URL)
+    const resumeUrlFromBody = typeof req.body?.resume === 'string' ? req.body.resume.trim() : '';
+    if (resumeUrlFromBody && !uploadedResume) {
+      console.log("📤 Resume URL provided in body:", resumeUrlFromBody);
+      uploadedResume = {
+        fileUrl: resumeUrlFromBody,
+        fileName: 'resume.pdf'
+      };
+    } else if ('resume' in req.body && !resumeUrlFromBody) {
+      // If resume field exists but is empty, user wants to delete resume
+      console.log("🗑️  Resume deletion requested in update");
+    }
+
     console.log("🟦 User authenticated, userId:", userId);
     
     // Check if profile exists
@@ -500,6 +534,10 @@ export const updateCurrentCandidateProfileController = async (req: Request, res:
 
     if (uploadedResume && (profile as any)?._id) {
       await syncProfileResume(String((profile as any)._id), uploadedResume.fileUrl, uploadedResume.fileName);
+    } else if ('resume' in req.body && !resumeUrlFromBody) {
+      // Delete resume if empty string was provided
+      await Resume.deleteOne({ candidate: (profile as any)?._id });
+      console.log("✅ Resume deleted successfully");
     }
 
     if (updatePayload.name !== undefined || updatePayload.email !== undefined) {

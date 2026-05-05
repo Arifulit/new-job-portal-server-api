@@ -44,7 +44,7 @@ router.use("/admin", adminRoutes);
 // Alias: /api/v1/users/profile → /api/v1/candidate/profile (for frontend compatibility)
 router.get("/users/profile", (req, res, next) => {
   req.url = "/candidate/profile";
-  router.handle(req, res, next);
+  (router as any).handle(req, res, next);
 });
 
 router.use("/jobs", jobRoutes);

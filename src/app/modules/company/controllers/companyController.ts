@@ -73,9 +73,21 @@ export const getCompanyProfile = async (req: Request, res: Response) => {
 export const createCompanyReview = async (req: Request, res: Response) => {
   try {
     const userId = (req.user as any)?._id?.toString() || (req.user as any)?.id?.toString();
+    const companyId = req.params.id;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+
+    // Check if recruiter is trying to review their own company
+    const RecruiterProfile = require("../../profile/recruiter/models/RecruiterProfile").RecruiterProfile;
+    const recruiterProfile = await RecruiterProfile.findOne({ user: userId });
+    
+    if (recruiterProfile && recruiterProfile.company?.toString() === companyId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You cannot review your own company" 
+      });
     }
 
     const review = await companyService.createCompanyReview(req.params.id, userId, {
@@ -92,9 +104,21 @@ export const createCompanyReview = async (req: Request, res: Response) => {
 export const updateCompanyReview = async (req: Request, res: Response) => {
   try {
     const userId = (req.user as any)?._id?.toString() || (req.user as any)?.id?.toString();
+    const companyId = req.params.id;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+
+    // Check if recruiter is trying to update review for their own company
+    const RecruiterProfile = require("../../profile/recruiter/models/RecruiterProfile").RecruiterProfile;
+    const recruiterProfile = await RecruiterProfile.findOne({ user: userId });
+    
+    if (recruiterProfile && recruiterProfile.company?.toString() === companyId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You cannot review your own company" 
+      });
     }
 
     const review = await companyService.updateCompanyReview(req.params.id, userId, {

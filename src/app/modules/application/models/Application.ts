@@ -5,6 +5,7 @@ export interface IApplication {
   candidate: Types.ObjectId;
   job: Types.ObjectId;
   status: "Applied" | "Reviewed" | "Shortlisted" | "Interview" | "Rejected" | "Accepted" | "Withdrawn";
+  interviewScheduledAt?: string;
   resume?: string;
   coverLetter?: string;
 }
@@ -17,6 +18,7 @@ const applicationSchema = new Schema<IApplication>({
     enum: ["Applied", "Reviewed", "Shortlisted", "Interview", "Rejected", "Accepted", "Withdrawn"],
     default: "Applied" 
   },
+  interviewScheduledAt: { type: String },
   resume: { type: String },
   coverLetter: { type: String },
 }, { timestamps: true });

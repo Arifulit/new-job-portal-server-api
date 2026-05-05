@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // এই controller application request handle করে auth check সহ service call চালায়।
 import { Request, Response, RequestHandler, NextFunction } from "express";
 import * as applicationService from "../services/applicationService";
@@ -507,12 +508,12 @@ export const updateApplication = async (req: AuthenticatedRequest, res: Response
     }
 
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, interviewScheduledAt } = req.body;
     const userRole = req.user.role;
     const userId = req.user.id || toIdString((req.user as any)?._id) || "";
 
-    // Case-insensitive status normalize - recruiters can set: Applied, Reviewed, Shortlisted, Interviewed, Rejected, Accepted
-    const statusMap: Record<string, "Applied" | "Reviewed" | "Shortlisted" | "Interviewed" | "Rejected" | "Accepted"> = {
+    // Case-insensitive status normalize - recruiters can set: Applied, Reviewed, Shortlisted, Interview, Rejected, Accepted
+    const statusMap: Record<string, "Applied" | "Reviewed" | "Shortlisted" | "Interview" | "Rejected" | "Accepted"> = {
       applied: "Applied",
       reviewed: "Reviewed",
       shortlisted: "Shortlisted",
@@ -532,6 +533,18 @@ export const updateApplication = async (req: AuthenticatedRequest, res: Response
       return res.status(400).json({
         success: false,
         message: "Invalid status. Must be one of: Applied, Reviewed, Shortlisted, Interview, Rejected, Accepted",
+      });
+    }
+
+    const normalizedInterviewScheduledAt =
+      typeof interviewScheduledAt === "string" && interviewScheduledAt.trim().length > 0
+        ? interviewScheduledAt.trim()
+        : "";
+
+    if (normalizedStatus === "Interview" && !normalizedInterviewScheduledAt) {
+      return res.status(400).json({
+        success: false,
+        message: "Interview date and time are required when changing status to Interview",
       });
     }
 
@@ -568,6 +581,7 @@ export const updateApplication = async (req: AuthenticatedRequest, res: Response
     }
 
     application.status = normalizedStatus || application.status;
+  application.set("interviewScheduledAt", normalizedStatus === "Interview" ? normalizedInterviewScheduledAt : undefined);
     await application.save();
 
     const candidateId = toIdString((application as any).candidate);
@@ -578,8 +592,9 @@ export const updateApplication = async (req: AuthenticatedRequest, res: Response
           await sendApplicationStatusUpdatedEmail({
             to: candidateUser.email,
             candidateName: candidateUser.name,
-            status: application.status as "Applied" | "Reviewed" | "Shortlisted" | "Interviewed" | "Rejected" | "Accepted",
+            status: application.status as "Applied" | "Reviewed" | "Shortlisted" | "Interview" | "Rejected" | "Accepted",
             jobTitle: (application as any).job?.title,
+            interviewScheduledAt: normalizedStatus === "Interview" ? normalizedInterviewScheduledAt : undefined,
           });
         } catch (mailError: any) {
           console.warn("Failed to send application status update email:", mailError?.message || mailError);
@@ -588,10 +603,15 @@ export const updateApplication = async (req: AuthenticatedRequest, res: Response
     }
 
     if (candidateId) {
+      const notificationMessage =
+        normalizedStatus === "Interview" && normalizedInterviewScheduledAt
+          ? `Your interview for ${(application as any).job?.title} has been scheduled for ${normalizedInterviewScheduledAt}.`
+          : `Your application status has been updated to ${application.status}.`;
+
       await createNotification({
         userId: candidateId,
         type: "Application",
-        message: `Your application status has been updated to ${application.status}.`,
+        message: notificationMessage,
         relatedId: (application as any)._id,
       });
     }

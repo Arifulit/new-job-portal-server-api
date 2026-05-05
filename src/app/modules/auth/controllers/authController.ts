@@ -4,9 +4,9 @@ import * as authService from "../services/authService";
 import { User } from "../models/User";
 import passport from "../../../config/passport";
 import { env } from "../../../config/env";
-import { CandidateProfile } from "../../profile/candidate/models/CandidateProfile";
-import { RecruiterProfile } from "../../profile/recruiter/models/RecruiterProfile";
-import { AdminProfile } from "../../profile/admin/models/AdminProfile";
+import { CandidateProfile, ICandidateProfile } from "../../profile/candidate/models/CandidateProfile";
+import { RecruiterProfile, IRecruiterProfile } from "../../profile/recruiter/models/RecruiterProfile";
+import { AdminProfile, IAdminProfile } from "../../profile/admin/models/AdminProfile";
 import Company from "../../company/models/Company";
 
 const ACCESS_TTL = "24h";
@@ -298,7 +298,7 @@ export const me = async (req: Request, res: Response) => {
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-    let profile: Record<string, unknown> | null = null;
+    let profile: ICandidateProfile | IRecruiterProfile | IAdminProfile | null = null;
     switch (user.role) {
       case "candidate":
         profile = await CandidateProfile.findOne({ user: userId }).lean();
@@ -311,7 +311,7 @@ export const me = async (req: Request, res: Response) => {
             address: "",
             skills: [],
           });
-          profile = createdProfile.toObject();
+          profile = createdProfile.toObject() as ICandidateProfile;
         }
         break;
       case "recruiter":

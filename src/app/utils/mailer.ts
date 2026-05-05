@@ -105,7 +105,7 @@ export const sendVerificationEmail = async ({
   email,
   verificationToken
 }: SendVerificationEmailParams) => {
-  const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
+  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
   const { subject, html, text } = getVerificationEmail({
     name,
     verificationUrl,
@@ -124,7 +124,7 @@ export const sendVerificationEmail = async ({
  * Send a password reset email
  */
 export const sendPasswordResetEmail = async (email: string, resetToken: string) => {
-  const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
   
   return sendEmail({
     to: email,

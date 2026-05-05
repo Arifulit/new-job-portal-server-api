@@ -30,11 +30,17 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req: Request, file: Express.Multer.File, cb: (error: Error | null, value?: boolean) => void) => {
-  // For resume uploads, only accept PDF files
-  if (file.mimetype === "application/pdf") {
+  // For resume uploads, accept PDF, DOC and DOCX files
+  const allowedMimes = new Set([
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ]);
+
+  if (allowedMimes.has(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Only PDF files are allowed for resume upload"), false);
+    cb(new Error("Only PDF, DOC or DOCX files are allowed for resume upload"), false);
   }
 };
 
@@ -42,15 +48,23 @@ export const upload = multer({ storage, fileFilter });
 export const imageUpload = upload;
 
 const resumeFileFilter = (req: Request, file: Express.Multer.File, cb: (error: Error | null, value?: boolean) => void) => {
-  const isPdfMime = file.mimetype === "application/pdf";
-  const isPdfByExt = path.extname(file.originalname || "").toLowerCase() === ".pdf";
+  const ext = path.extname(file.originalname || "").toLowerCase();
+  const allowedExts = new Set([".pdf", ".doc", ".docx"]);
+  const allowedMimes = new Set([
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ]);
 
-  if (isPdfMime || isPdfByExt) {
+  const isAllowedMime = allowedMimes.has(file.mimetype);
+  const isAllowedExt = allowedExts.has(ext);
+
+  if (isAllowedMime || isAllowedExt) {
     cb(null, true);
     return;
   }
 
-  cb(new Error("Only PDF files are allowed for resume upload"), false);
+  cb(new Error("Only PDF, DOC or DOCX files are allowed for resume upload"), false);
 };
 
 export const resumeUpload = multer({
@@ -101,9 +115,11 @@ const allowedProfileResumeMimeTypes = new Set([
   "image/webp",
   "image/gif",
   "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 
-const allowedProfileResumeExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"]);
+const allowedProfileResumeExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf", ".doc", ".docx"]);
 
 const profileMediaFileFilter = (req: Request, file: Express.Multer.File, cb: (error: Error | null, value?: boolean) => void) => {
   const ext = path.extname(file.originalname || "").toLowerCase();

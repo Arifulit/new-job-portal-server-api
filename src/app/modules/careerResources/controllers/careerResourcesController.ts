@@ -1,3 +1,6 @@
+import { Request, Response } from "express";
+import CareerResource from "../models/CareerResource";
+
 // GET: Single resource by id
 export const getCareerResourceById = async (req: Request, res: Response) => {
   try {
@@ -11,8 +14,6 @@ export const getCareerResourceById = async (req: Request, res: Response) => {
     res.status(400).json({ success: false, message: "Invalid resource id" });
   }
 };
-import { Request, Response } from "express";
-import CareerResource from "../models/CareerResource";
 
 // GET: Anyone can get all career resources
 export const getCareerResources = async (req: Request, res: Response) => {

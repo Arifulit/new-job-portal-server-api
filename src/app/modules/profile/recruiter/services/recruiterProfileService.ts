@@ -1,5 +1,7 @@
 import { RecruiterProfile } from "../models/RecruiterProfile";
 import { User } from "../../../auth/models/User";
+import { Job } from "../../../job/models/Job";
+import { Application } from "../../../application/models/Application";
 
 // dto/index.ts does not export a module; use simple local types until the dto barrel file is fixed
 type CreateRecruiterProfileDTO = any;
@@ -10,10 +12,28 @@ export const createRecruiterProfile = async (data: CreateRecruiterProfileDTO) =>
 };
 
 export const getRecruiterProfile = async (userId: string) => {
-  return await RecruiterProfile.findOne({ user: userId })
+  const profile = await RecruiterProfile.findOne({ user: userId })
     .populate("user", "name email role avatar")
     .populate("company", "name industry size yearOfEstablishment address location website logo email phone description isVerified verifiedAt verifiedBy createdAt updatedAt")
     .lean();
+
+  if (!profile) {
+    return null;
+  }
+
+  // Calculate stats
+  const jobsPosted = await Job.countDocuments({ createdBy: userId });
+  
+  // Count applications for jobs created by this recruiter
+  const recruiterJobIds = await Job.find({ createdBy: userId }).select("_id").lean();
+  const jobIdsList = recruiterJobIds.map(job => job._id);
+  const applicantsCount = await Application.countDocuments({ job: { $in: jobIdsList } });
+
+  return {
+    ...profile,
+    jobsPosted,
+    applicantsCount,
+  };
 };
 
 export const updateRecruiterProfile = async (userId: string, data: any) => {
@@ -59,6 +79,18 @@ export const updateRecruiterProfile = async (userId: string, data: any) => {
   if (!profile) {
     throw new Error('Recruiter profile not found');
   }
+
+  // Calculate stats
+  const jobsPosted = await Job.countDocuments({ createdBy: userId });
   
-  return profile;
+  // Count applications for jobs created by this recruiter
+  const recruiterJobIds = await Job.find({ createdBy: userId }).select("_id").lean();
+  const jobIdsList = recruiterJobIds.map(job => job._id);
+  const applicantsCount = await Application.countDocuments({ job: { $in: jobIdsList } });
+
+  return {
+    ...profile,
+    jobsPosted,
+    applicantsCount,
+  };
 };
