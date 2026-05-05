@@ -71,7 +71,7 @@ const adminProfileSchema = new Schema<IAdminProfile>({
 }, { 
   timestamps: true,
   toJSON: {
-    transform: function(_doc, ret: Record<string, unknown>) {
+    transform: function(_doc: any, ret: Record<string, unknown>) {
       delete ret.password;
       delete ret.__v;
       return ret;
@@ -91,7 +91,7 @@ adminProfileSchema.methods.comparePassword = async function(candidatePassword: s
 };
 
 // Pre-save hook to hash password
-adminProfileSchema.pre('save', async function(next) {
+adminProfileSchema.pre('save', async function(this: any, next: any) {
   if (!this.isModified('password')) return next();
   
   try {
