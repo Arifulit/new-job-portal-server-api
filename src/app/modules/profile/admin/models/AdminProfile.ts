@@ -1,4 +1,4 @@
-import { Schema, model, Types } from "mongoose";
+import { CallbackWithoutResultAndOptionalError, HydratedDocument, Schema, model, Types } from "mongoose";
 
 export interface IAdminProfile {
   _id: Types.ObjectId;
@@ -71,7 +71,7 @@ const adminProfileSchema = new Schema<IAdminProfile>({
 }, { 
   timestamps: true,
   toJSON: {
-    transform: function(_doc: any, ret: Record<string, unknown>) {
+    transform: function(_doc: unknown, ret: Record<string, unknown>) {
       delete ret.password;
       delete ret.__v;
       return ret;
@@ -91,7 +91,7 @@ adminProfileSchema.methods.comparePassword = async function(candidatePassword: s
 };
 
 // Pre-save hook to hash password
-adminProfileSchema.pre('save', async function(this: any, next: any) {
+adminProfileSchema.pre('save', async function(this: HydratedDocument<IAdminProfile>, next: CallbackWithoutResultAndOptionalError) {
   if (!this.isModified('password')) return next();
   
   try {
