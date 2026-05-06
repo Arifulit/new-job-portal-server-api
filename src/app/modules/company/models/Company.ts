@@ -3,6 +3,7 @@ import mongoose, { Schema, model } from "mongoose";
 
 export interface ICompany {
   name: string;
+  owner?: Schema.Types.ObjectId | null;
   industry?: string;
   size?: string;
   yearOfEstablishment?: number;
@@ -21,6 +22,7 @@ export interface ICompany {
 
 const companySchema = new Schema<ICompany>({
   name: { type: String, required: true, unique: true },
+  owner: { type: Schema.Types.ObjectId, ref: 'User', unique: true, sparse: true, default: null },
   industry: { type: String },
   size: { type: String },
   yearOfEstablishment: { type: Number },

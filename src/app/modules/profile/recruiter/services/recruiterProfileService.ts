@@ -56,6 +56,9 @@ export const updateRecruiterProfile = async (userId: string, data: any) => {
     await User.findByIdAndUpdate(userId, { $set: userUpdates }, { new: false });
   }
 
+  const recruiterUser = await User.findById(userId).select("email").lean();
+  const recruiterEmail = typeof recruiterUser?.email === "string" ? recruiterUser.email.trim().toLowerCase() : "";
+
   const normalizedRest = { ...rest } as any;
   if (normalizedRest.biodata !== undefined && normalizedRest.bio === undefined) {
     normalizedRest.bio = normalizedRest.biodata;
@@ -80,6 +83,24 @@ export const updateRecruiterProfile = async (userId: string, data: any) => {
       profileUpdates.company = incomingCompany;
     } else if (incomingCompany && typeof incomingCompany === "object") {
       const companyPayload = incomingCompany as Record<string, unknown>;
+      const incomingCompanyId =
+        typeof companyPayload._id === "string" && Types.ObjectId.isValid(companyPayload._id)
+          ? companyPayload._id
+          : null;
+
+      if (existingRecruiterProfile?.company && incomingCompanyId) {
+        const existingCompanyId =
+          typeof existingRecruiterProfile.company === "string"
+            ? existingRecruiterProfile.company
+            : existingRecruiterProfile.company && typeof existingRecruiterProfile.company === "object"
+            ? String(existingRecruiterProfile.company)
+            : null;
+
+        if (existingCompanyId && existingCompanyId !== incomingCompanyId) {
+          throw new Error("Recruiter can only manage one company. Edit the existing company instead.");
+        }
+      }
+
       const companyUpdateData = {
         ...(typeof companyPayload.name === "string" && companyPayload.name.trim()
           ? { name: companyPayload.name.trim() }
@@ -107,10 +128,9 @@ export const updateRecruiterProfile = async (userId: string, data: any) => {
         ...(typeof companyPayload.logo === "string" ? { logo: companyPayload.logo.trim() } : {}),
       };
 
-      const incomingCompanyId =
-        typeof companyPayload._id === "string" && Types.ObjectId.isValid(companyPayload._id)
-          ? companyPayload._id
-          : null;
+      if (!companyUpdateData.email && recruiterEmail) {
+        companyUpdateData.email = recruiterEmail;
+      }
 
       const existingCompanyId =
         typeof existingRecruiterProfile?.company === "string"
@@ -122,12 +142,27 @@ export const updateRecruiterProfile = async (userId: string, data: any) => {
       const targetCompanyId = incomingCompanyId || existingCompanyId;
 
       if (targetCompanyId && Types.ObjectId.isValid(targetCompanyId)) {
+        // Update existing company if there's any data to update
         if (Object.keys(companyUpdateData).length > 0) {
-          await Company.findByIdAndUpdate(targetCompanyId, { $set: companyUpdateData }, { new: false });
+          await Company.findByIdAndUpdate(
+            targetCompanyId,
+            { $set: { ...companyUpdateData, owner: userId } },
+            { new: false }
+          );
         }
         profileUpdates.company = targetCompanyId;
-      } else if (Object.keys(companyUpdateData).length > 0 && companyUpdateData.name) {
-        const createdCompany = await Company.create(companyUpdateData);
+      } else if (Object.keys(companyUpdateData).length > 0) {
+        // Create new company if no existing company ID and there's data to save
+        // Use provided name or generate a placeholder
+        const companyName = companyUpdateData.name 
+          ? String(companyUpdateData.name).trim() 
+          : `Company-${Date.now()}`;
+        
+        const createdCompany = await Company.create({
+          ...companyUpdateData,
+          name: companyName,
+          owner: userId,
+        });
         profileUpdates.company = createdCompany._id;
       }
     }

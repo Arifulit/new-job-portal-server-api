@@ -9,8 +9,10 @@ import companyRoutes from "../modules/company/routes/companyRoutes";
 import authRoutes from "../modules/auth/routes/authRoutes";
 import recruiterRoutes from "../modules/profile/recruiter/routes";
 import adminRoutes from "../modules/profile/admin/routes";
+import homeRoutes from "../modules/home/routes";
 import messageRoutes from "../modules/message/routes/messageRoutes";
 import notificationRoutes from "../modules/notification/routes/notificationRoutes";
+import contactRoutes from "../modules/contact/routes/contactRoutes";
 import { authMiddleware } from "../middleware/auth";
 
 import careerResourcesRoutes from "../modules/careerResources/routes";
@@ -31,6 +33,9 @@ router.use("/resume", resumeRoutes);
 
 // Public career resources
 router.use("/career-resources", careerResourcesRoutes);
+
+// Public homepage summary data
+router.use("/home", homeRoutes);
 
 // Public summary stats
 router.use("/analytics", summaryStatsRoutes);
@@ -55,6 +60,7 @@ router.use("/company", companyRoutes);
 router.use("/salary", salaryRoutes);
 router.use("/messages", messageRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/contact", contactRoutes);
 
 // Compatibility aliases for dashboard stats endpoints used by different clients.
 router.get(

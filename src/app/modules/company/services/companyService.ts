@@ -6,9 +6,17 @@ import { Types } from "mongoose";
 export const createCompany = async (data: ICompany) => {
   const normalizedName = String(data.name || "").trim();
   const normalizedEmail = data.email ? String(data.email).trim().toLowerCase() : "";
+  const ownerId = data.owner ? String(data.owner) : "";
 
   if (!normalizedName || !normalizedEmail) {
     throw new Error("Company name and email are required");
+  }
+
+  if (ownerId) {
+    const existingByOwner = await Company.findOne({ owner: ownerId }).select("_id").lean().exec();
+    if (existingByOwner) {
+      throw new Error("Recruiter already has a company");
+    }
   }
 
   const existing = await Company.findOne({
@@ -22,7 +30,8 @@ export const createCompany = async (data: ICompany) => {
   const company = await Company.create({
     ...data,
     name: normalizedName,
-    email: normalizedEmail
+    email: normalizedEmail,
+    ...(ownerId ? { owner: ownerId } : {}),
   });
   return company;
 };
@@ -60,6 +69,10 @@ export const updateCompany = async (id: string, data: Partial<ICompany>) => {
     if (existingByName) {
       throw new Error("Another company already uses this name");
     }
+  }
+
+  if (data.owner !== undefined) {
+    throw new Error("Company owner cannot be changed");
   }
 
   const updated = await Company.findByIdAndUpdate(id, data, { new: true });

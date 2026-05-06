@@ -556,7 +556,7 @@ export const updateApplication = async (req: AuthenticatedRequest, res: Response
     }
 
     application.status = normalizedStatus || application.status;
-  application.set("interviewScheduledAt", normalizedStatus === "Interview" ? normalizedInterviewScheduledAt : undefined);
+    application.set("interviewScheduledAt", normalizedStatus === "Interview" ? normalizedInterviewScheduledAt : undefined);
     await application.save();
 
     const candidateId = toIdString((application as any).candidate);
@@ -717,7 +717,7 @@ export const getJobApplicationsNew = async (req: AuthenticatedRequest, res: Resp
     }
 
     if (userRole === "admin") {
-      const applications = await applicationService.getApplicationsByJob(jobId);
+      const applications = await applicationService.getJobApplicationsNew(jobId, userId);
       return res.status(200).json({ success: true, data: applications });
     }
 
@@ -729,7 +729,7 @@ export const getJobApplicationsNew = async (req: AuthenticatedRequest, res: Resp
           message: "You can only view applications for jobs you created",
         });
       }
-      const applications = await applicationService.getApplicationsByJob(jobId);
+      const applications = await applicationService.getJobApplicationsNew(jobId, userId);
       return res.status(200).json({ success: true, data: applications });
     }
 

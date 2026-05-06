@@ -15,6 +15,8 @@ const avatarUploadMiddleware = (req: Request, res: Response, next: NextFunction)
   avatarUpload.fields([
     { name: "avatar", maxCount: 1 },
     { name: "profilePicture", maxCount: 1 },
+    { name: "companyLogo", maxCount: 1 },
+    { name: "logo", maxCount: 1 },
     { name: "image", maxCount: 1 },
     { name: "file", maxCount: 1 },
   ])(req, res, (error: any) => {

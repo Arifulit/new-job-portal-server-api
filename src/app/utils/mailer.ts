@@ -56,6 +56,7 @@ interface MailOptions {
   text: string;
   html?: string;
   from?: string;
+  replyTo?: string;
 }
 
 /**
@@ -66,6 +67,7 @@ export const sendEmail = async ({
   subject, 
   text, 
   html,
+  replyTo,
   from = process.env.SMTP_FROM || "noreply@yourdomain.com"
 }: MailOptions) => {
   if (!isSmtpConfigured) {
@@ -80,7 +82,8 @@ export const sendEmail = async ({
       to,
       subject,
       text,
-      html
+      html,
+      replyTo
     });
     
     console.log("Message sent: %s", info.messageId);

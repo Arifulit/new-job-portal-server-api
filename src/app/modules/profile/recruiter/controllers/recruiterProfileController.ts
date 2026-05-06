@@ -69,6 +69,76 @@ const uploadAvatarToCloudinary = async (file: Express.Multer.File): Promise<stri
   }
 };
 
+const getUploadedCompanyLogoFile = (req: Request): Express.Multer.File | undefined => {
+  const uploadedFile = (req as any).file as Express.Multer.File | undefined;
+  const uploadedFiles = (req as any).files as
+    | Record<string, Express.Multer.File[]>
+    | Express.Multer.File[]
+    | undefined;
+
+  if (uploadedFile && ["companyLogo", "logo"].includes(uploadedFile.fieldname)) {
+    return uploadedFile;
+  }
+
+  if (Array.isArray(uploadedFiles)) {
+    return uploadedFiles.find((file) => ["companyLogo", "logo"].includes(file.fieldname));
+  }
+
+  return uploadedFiles?.companyLogo?.[0] || uploadedFiles?.logo?.[0];
+};
+
+const uploadCompanyLogoToCloudinary = async (file: Express.Multer.File): Promise<string> => {
+  try {
+    const cloudResult = await cloudinary.uploader.upload(file.path, {
+      folder: "job-portal/company-logos",
+      resource_type: "image",
+      type: "upload",
+    });
+
+    return cloudResult.secure_url || cloudResult.url;
+  } finally {
+    if (file.path) {
+      fs.unlink(file.path, () => {});
+    }
+  }
+};
+
+const normalizeRecruiterPayload = (input: Record<string, unknown>): Record<string, unknown> => {
+  const normalized: Record<string, unknown> = {};
+  const company: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(input)) {
+    if (key.startsWith("company[") && key.endsWith("]")) {
+      const field = key.slice(8, -1);
+      company[field] = value;
+      continue;
+    }
+
+    normalized[key] = value;
+  }
+
+  if (typeof normalized.company === "string") {
+    const rawCompany = normalized.company.trim();
+    if (rawCompany.startsWith("{") && rawCompany.endsWith("}")) {
+      try {
+        normalized.company = JSON.parse(rawCompany);
+      } catch {
+        // Keep raw value if parsing fails.
+      }
+    }
+  }
+
+  if (Object.keys(company).length > 0) {
+    const existingCompany =
+      normalized.company && typeof normalized.company === "object"
+        ? (normalized.company as Record<string, unknown>)
+        : {};
+    normalized.company = { ...existingCompany, ...company };
+  }
+
+  return normalized;
+};
+
 export const createRecruiterProfileController = async (req: Request, res: Response) => {
   try {
     const avatarFile = getUploadedAvatarFile(req);
@@ -162,11 +232,21 @@ export const getRecruiterProfileController = async (req: Request, res: Response)
 export const updateRecruiterProfileController = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const updateData = { ...(req.body || {}) };
+    const updateData = normalizeRecruiterPayload({ ...(req.body || {}) });
 
     const avatarFile = getUploadedAvatarFile(req);
     if (avatarFile) {
       updateData.avatar = await uploadAvatarToCloudinary(avatarFile);
+    }
+
+    const companyLogoFile = getUploadedCompanyLogoFile(req);
+    if (companyLogoFile) {
+      const uploadedLogo = await uploadCompanyLogoToCloudinary(companyLogoFile);
+      const existingCompany =
+        updateData.company && typeof updateData.company === "object"
+          ? (updateData.company as Record<string, unknown>)
+          : {};
+      updateData.company = { ...existingCompany, logo: uploadedLogo };
     }
 
     if (!userId) {
@@ -184,7 +264,7 @@ export const updateRecruiterProfileController = async (req: Request, res: Respon
     }
 
     // Validate phone number format if provided
-    if (updateData.phone && !/^\+?[0-9]{11,15}$/.test(updateData.phone)) {
+    if (updateData.phone && !/^\+?[0-9]{11,15}$/.test(String(updateData.phone))) {
       return res.status(400).json({ 
         success: false, 
         message: 'Please provide a valid phone number' 

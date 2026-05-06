@@ -19,9 +19,19 @@ import { getJobApplications } from "../../application/controllers/applicationCon
 import { authMiddleware, optionalAuth } from "../../../middleware/auth";
 import adminJobRoutes from "./adminJobRoutes";
 import { adminGetAllJobs } from "../controllers/jobAdminController";
-import { upload as imageUpload } from "../../../middleware/upload";
+import { imageUpload } from "../../../middleware/upload";
 
 const router = Router();
+
+const handleJobLogoUpload: RequestHandler = (req, res, next) => {
+  const contentType = req.headers["content-type"] || "";
+
+  if (contentType.includes("multipart/form-data")) {
+    return imageUpload.single("logo")(req, res, next);
+  }
+
+  next();
+};
 
 // Mount admin job routes
 router.use('/admin/jobs', authMiddleware(['admin']) as RequestHandler, adminJobRoutes);
@@ -114,13 +124,7 @@ router.get(
 router.post(
   "/create",
   authMiddleware(["admin", "recruiter"]) as RequestHandler,
-  (req, res, next) => {
-    const contentType = req.headers["content-type"] || "";
-    if (contentType.includes("multipart/form-data")) {
-      return imageUpload.single("logo")(req, res, next);
-    }
-    next();
-  },
+  handleJobLogoUpload,
   handleRoute(createJob)
 );
 
@@ -132,6 +136,7 @@ router.put(
     next();
   },
   authMiddleware(["admin", "recruiter"]) as RequestHandler,
+  handleJobLogoUpload,
   handleRoute(updateJob)
 );
 
@@ -143,6 +148,7 @@ router.patch(
     next();
   },
   authMiddleware(["admin", "recruiter"]) as RequestHandler,
+  handleJobLogoUpload,
   handleRoute(updateJob)
 );
 

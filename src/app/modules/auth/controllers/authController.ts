@@ -4,6 +4,8 @@ import * as authService from "../services/authService";
 import { User } from "../models/User";
 import passport from "../../../config/passport";
 import { env } from "../../../config/env";
+import cloudinary from "../../../config/cloudinary";
+import fs from "node:fs";
 import { CandidateProfile, ICandidateProfile } from "../../profile/candidate/models/CandidateProfile";
 import { RecruiterProfile, IRecruiterProfile } from "../../profile/recruiter/models/RecruiterProfile";
 import { AdminProfile, IAdminProfile } from "../../profile/admin/models/AdminProfile";
@@ -75,6 +77,8 @@ export const register = async (req: Request, res: Response) => {
 
     const userId = user._id.toString();
 
+    const companyLogoFile = (req as any).file as Express.Multer.File | undefined;
+
     switch (role) {
       case "candidate":
         if (!phone || !biodata || !location) {
@@ -88,11 +92,34 @@ export const register = async (req: Request, res: Response) => {
           return res.status(400).json({ success: false, message: "Missing recruiter required fields" });
         }
         const normalizedCompanyName = String(companyName).trim();
-        const companyDoc = await Company.findOneAndUpdate(
-          { name: { $regex: `^${normalizedCompanyName}$`, $options: "i" } },
-          { $set: { industry: String(industryType).trim(), website: String(websiteUrl).trim(), address: String(companyAddress).trim(), yearOfEstablishment: Number(yearOfEstablishment) }, $setOnInsert: { name: normalizedCompanyName, isVerified: false } },
-          { new: true, upsert: true },
-        );
+        const normalizedEmail = String(email).trim().toLowerCase();
+        const companyDoc = await Company.create({
+          name: normalizedCompanyName,
+          owner: userId,
+          email: normalizedEmail,
+          industry: String(industryType).trim(),
+          website: String(websiteUrl).trim(),
+          address: String(companyAddress).trim(),
+          yearOfEstablishment: Number(yearOfEstablishment),
+          isVerified: false,
+        });
+        if (companyLogoFile) {
+          try {
+            const cloudResult = await cloudinary.uploader.upload(companyLogoFile.path, {
+              folder: "job-portal/company-logos",
+              resource_type: "image",
+              type: "upload",
+            });
+            const uploadedLogoUrl = cloudResult.secure_url || cloudResult.url;
+            if (uploadedLogoUrl) {
+              await Company.findByIdAndUpdate(companyDoc._id, { $set: { logo: uploadedLogoUrl } }, { new: false });
+            }
+          } finally {
+            if (companyLogoFile.path) {
+              try { fs.unlinkSync(companyLogoFile.path); } catch { /* ignore */ }
+            }
+          }
+        }
         await RecruiterProfile.create({ user: userId, phone, designation, bio: String(biodata).trim(), location: String(location).trim(), company: companyDoc._id });
         break;
       }

@@ -107,6 +107,11 @@ const getCandidateExperienceYears = (candidate: CandidateRecord): number => {
 
   if (typeof experience === "number" && Number.isFinite(experience)) {
     return Math.max(0, experience);
+
+
+
+
+
   }
 
   if (typeof experience === "string") {
@@ -236,24 +241,22 @@ const computeDeterministicScore = (jobDescription: string, candidate: CandidateR
 
   const skillBase = jobSkillTokens.size > 0 ? jobSkillTokens : descriptionTokens;
   const skillScore = skillBase.size
-    ? (matchedSkills.length / skillBase.size) * 50
+    ? (matchedSkills.length / skillBase.size) * 70
     : 0;
 
   const experienceYears = getCandidateExperienceYears(candidate);
   const targetExperience = job ? getExperienceTarget(job) : 0;
   const experienceScore = targetExperience > 0
-    ? Math.min(experienceYears / targetExperience, 1) * 20
-    : Math.min(experienceYears, 10) / 10 * 20;
+    ? Math.min(experienceYears / targetExperience, 1) * 25
+    : Math.min(experienceYears, 10) / 10 * 25;
 
   const educationMatch =
     jobEducationTokens.size === 0 ||
     Array.from(jobEducationTokens).some((token) => candidateEducationTokens.has(token));
-  const educationScore = educationMatch ? 10 : 0;
+  const educationScore = educationMatch ? 5 : 0;
 
   const keywordHits = Array.from(descriptionTokens).filter((token) => candidateTextTokens.has(token));
-  const keywordScore = descriptionTokens.size
-    ? Math.min((keywordHits.length / descriptionTokens.size) * 15, 15)
-    : 0;
+  const keywordScore = 0; // Keywords removed from scoring, kept only for reasons
 
   const rawScore = Math.round(skillScore + experienceScore + educationScore + keywordScore);
 

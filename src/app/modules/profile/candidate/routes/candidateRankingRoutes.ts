@@ -76,7 +76,31 @@ router.get(
       const aiQuery = String(req.query.ai || "").toLowerCase().trim();
       const useAI = aiQuery === "true" || aiQuery === "1" || aiQuery === "yes";
 
-      // Get all candidates
+      // Extract user info - log for debugging
+      const userId = (req.user as { _id?: unknown; id?: unknown })?._id || (req.user as { _id?: unknown; id?: unknown })?.id;
+      const userRole = (req.user as { role?: unknown })?.role;
+      
+      console.log(`📊 GET /ranked - jobId: ${jobId}, userId: ${userId}, role: ${userRole}`);
+
+      // If jobId is provided, use the ranking service which will fetch job applicants
+      if (jobId) {
+        const result = await rankCandidatesForRecruiter({
+          jobId,
+          jobDescription: "", // Service will fetch from job
+          candidates: undefined, // Service will fetch applicants from job
+          useAI,
+          requesterId: String(userId || ""),
+          requesterRole: String(userRole || ""),
+        });
+
+        return res.json({
+          message: "Ranked candidates retrieved successfully",
+          aiEnabled: useAI,
+          ...result,
+        });
+      }
+
+      // Otherwise, get all candidates and rank them
       const candidates = await CandidateProfile.find()
         .populate("user", "name email avatar")
         .lean()
@@ -87,7 +111,7 @@ router.get(
           success: true,
           message: "No candidates found",
           candidateCount: 0,
-          data: [],
+          rankedCandidates: [],
         });
       }
 
@@ -107,14 +131,13 @@ router.get(
         };
       });
 
-      // Use ranking service to rank candidates
+      // Use ranking service to rank all candidates
       const result = await rankCandidatesForRecruiter({
-        jobId,
-        jobDescription: "",
+        jobDescription: "General Candidate Ranking",
         candidates: candidatesList,
         useAI,
-        requesterId: String(((req.user as { _id?: unknown; id?: unknown })?._id || (req.user as { _id?: unknown; id?: unknown })?.id || "")),
-        requesterRole: String(((req.user as { role?: unknown })?.role || "")),
+        requesterId: String(userId || ""),
+        requesterRole: String(userRole || ""),
       });
 
       return res.json({
@@ -123,10 +146,41 @@ router.get(
         ...result,
       });
     } catch (error) {
-      return res.status(400).json({
+      console.error("❌ GET /ranked error:", error);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      
+      // Return 404 for not found errors
+      if (errorMsg.includes("not found") || errorMsg.includes("Not found")) {
+        return res.status(404).json({
+          success: false,
+          message: "Job or candidates not found",
+          error: errorMsg,
+        });
+      }
+      
+      // Return 403 for permission errors
+      if (errorMsg.includes("can only rank") || errorMsg.includes("permission")) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to rank candidates for this job",
+          error: errorMsg,
+        });
+      }
+
+      // Return 400 for validation errors
+      if (errorMsg.includes("No candidates") || errorMsg.includes("Provide")) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid ranking request",
+          error: errorMsg,
+        });
+      }
+
+      // Return 500 for other errors
+      return res.status(500).json({
         success: false,
         message: "Failed to rank candidates",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMsg,
       });
     }
   },

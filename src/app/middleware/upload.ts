@@ -45,7 +45,31 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: (error: Error |
 };
 
 export const upload = multer({ storage, fileFilter });
-export const imageUpload = upload;
+
+const logoImageFileFilter = (req: Request, file: Express.Multer.File, cb: (error: Error | null, value?: boolean) => void) => {
+  const ext = path.extname(file.originalname || "").toLowerCase();
+  const allowedMimes = new Set(["image/jpeg", "image/jpg", "image/png"]);
+  const allowedExts = new Set([".jpg", ".jpeg", ".png"]);
+
+  const isAllowedMime = allowedMimes.has(file.mimetype);
+  const isAllowedExt = allowedExts.has(ext);
+
+  if (isAllowedMime || isAllowedExt) {
+    cb(null, true);
+    return;
+  }
+
+  cb(new Error("Only JPG, JPEG or PNG files are allowed for company logo upload"), false);
+};
+
+export const imageUpload = multer({
+  storage,
+  fileFilter: logoImageFileFilter,
+  limits: {
+    fileSize: 3 * 1024 * 1024,
+    files: 1,
+  },
+});
 
 const resumeFileFilter = (req: Request, file: Express.Multer.File, cb: (error: Error | null, value?: boolean) => void) => {
   const ext = path.extname(file.originalname || "").toLowerCase();

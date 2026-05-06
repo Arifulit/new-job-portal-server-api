@@ -1,10 +1,13 @@
 // এই controller job module এর request handle করে service layer এ পাঠায়।
-import { Response, NextFunction } from "express";
+import { Response, NextFunction, Request } from "express";
+import fs from "fs";
 import * as jobService from "../services/jobService";
 import { AuthenticatedRequest } from "../../../../types/express";
 import { IJobUpdateData, Job } from "../models/Job";
 import { Types } from "mongoose";
 import { User } from "../../auth/models/User";
+import cloudinary from "../../../config/cloudinary";
+import { Company } from "../../company/models/Company";
 
 const supportedJobTypes = new Set([
   "full-time",
@@ -393,6 +396,58 @@ const normalizeResponsibilities = (value: unknown): string[] | undefined => {
   return undefined;
 };
 
+const getUploadedLogoFile = (req: Request): Express.Multer.File | undefined => {
+  const uploadedFile = (req as any).file as Express.Multer.File | undefined;
+  const uploadedFiles = (req as any).files as
+    | Record<string, Express.Multer.File[]>
+    | Express.Multer.File[]
+    | undefined;
+
+  if (uploadedFile) {
+    return uploadedFile;
+  }
+
+  if (Array.isArray(uploadedFiles)) {
+    return uploadedFiles[0];
+  }
+
+  return uploadedFiles?.logo?.[0] || uploadedFiles?.file?.[0] || uploadedFiles?.image?.[0];
+};
+
+const resolveCompanyId = (value: unknown): string | null => {
+  if (typeof value === "string" && Types.ObjectId.isValid(value)) {
+    return value;
+  }
+
+  if (value && typeof value === "object") {
+    const nestedId = (value as { _id?: unknown })._id;
+    if (typeof nestedId === "string" && Types.ObjectId.isValid(nestedId)) {
+      return nestedId;
+    }
+    if (nestedId instanceof Types.ObjectId) {
+      return nestedId.toString();
+    }
+  }
+
+  return null;
+};
+
+const uploadLogoToCloudinary = async (file: Express.Multer.File): Promise<string> => {
+  try {
+    const cloudResult = await cloudinary.uploader.upload(file.path, {
+      folder: "job-portal/company-logos",
+      resource_type: "image",
+      type: "upload",
+    });
+
+    return cloudResult.secure_url || cloudResult.url;
+  } finally {
+    if (file.path) {
+      fs.unlink(file.path, () => {});
+    }
+  }
+};
+
 const normalizeRequirements = (value: unknown): string[] | undefined => {
   if (Array.isArray(value)) {
     const cleaned = value
@@ -699,6 +754,9 @@ export const createJob: AuthenticatedHandler = async (req, res, next) => {
 
     const experienceLevel =
       req.body.experienceLevel || inferExperienceLevel(req.body.experience);
+    const uploadedLogoFile = getUploadedLogoFile(req);
+    const uploadedLogoUrl = uploadedLogoFile ? await uploadLogoToCloudinary(uploadedLogoFile) : undefined;
+    const companyId = resolveCompanyId(req.body.company);
 
     let autoApproveJob = req.user.role === "admin";
 
@@ -771,6 +829,10 @@ export const createJob: AuthenticatedHandler = async (req, res, next) => {
       vacancies: req.body.vacancies,
     };
 
+    if (companyId) {
+      (jobData as any).company = companyId;
+    }
+
     if (
       typeof (jobData as any).ageMin === "number" &&
       typeof (jobData as any).ageMax === "number" &&
@@ -791,6 +853,24 @@ export const createJob: AuthenticatedHandler = async (req, res, next) => {
     delete (jobData as any).maxAge;
     delete (jobData as any).gender;
     delete (jobData as any).industryExperience;
+
+    if (uploadedLogoUrl && companyId) {
+      // Only allow admins to change company logo during job creation.
+      if (req.user && req.user.role === "admin") {
+        await Company.findByIdAndUpdate(
+          companyId,
+          { $set: { logo: uploadedLogoUrl } },
+          { new: false },
+        );
+
+        if (typeof (jobData as any).company === "object" && (jobData as any).company !== null) {
+          (jobData as any).company = { ...(jobData as any).company, logo: uploadedLogoUrl };
+        }
+      } else {
+        // Recruiters are not allowed to update company logo here. Ignore uploaded logo.
+        console.log("[createJob] recruiter attempted to upload company logo during job creation; ignoring upload.");
+      }
+    }
 
     const job = await jobService.createJob(jobData);
     return res.status(201).json({
@@ -849,11 +929,25 @@ export const updateJob: AuthenticatedHandler = async (req, res, next) => {
       isAdmin,
     );
 
+    const uploadedLogoFile = getUploadedLogoFile(req);
+    const uploadedLogoUrl = uploadedLogoFile ? await uploadLogoToCloudinary(uploadedLogoFile) : undefined;
+    const companyId = resolveCompanyId(req.body?.company ?? (job as any)?.company);
+
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
         success: false,
         message: "No valid update fields provided",
       });
+    }
+
+    if (uploadedLogoUrl && companyId) {
+      await Company.findByIdAndUpdate(
+        companyId,
+        { $set: { logo: uploadedLogoUrl } },
+        { new: false },
+      );
+
+      (updateData as any).company = companyId;
     }
 
     // Validate the update data if needed
@@ -1149,8 +1243,11 @@ export const getAllJobs: AuthenticatedHandler = async (req, res, next) => {
 
     const queryFilters = buildJobListFilters(req.query);
     const authUserId = getAuthUserId(req.user);
+    // Check if this request came from the /recruiter/jobs route
+    // req.baseUrl will be /recruiter, req.path will be /jobs
+    const isRecruiterOwnJobsRoute = req.baseUrl?.includes("/recruiter") && req.path === "/jobs";
 
-    if (req.user?.role === "recruiter") {
+    if (isRecruiterOwnJobsRoute && req.user?.role === "recruiter") {
       if (!authUserId || !Types.ObjectId.isValid(authUserId)) {
         return res.status(401).json({
           success: false,
@@ -1159,6 +1256,7 @@ export const getAllJobs: AuthenticatedHandler = async (req, res, next) => {
       }
 
       queryFilters.createdBy = new Types.ObjectId(authUserId);
+      console.log(`📋 Recruiter ${authUserId} fetching own jobs only (filtered by createdBy)`);
 
       // Recruiters should be able to query all of their own jobs, not only approved ones.
       if (req.query.status === undefined && req.query.isApproved === undefined) {
@@ -1167,7 +1265,7 @@ export const getAllJobs: AuthenticatedHandler = async (req, res, next) => {
       }
     }
 
-    const [jobs, total] = await Promise.all([
+    const [jobs, total, totalVacanciesAgg] = await Promise.all([
       jobService.getJobs({
         filters: queryFilters,
         sort,
@@ -1179,7 +1277,18 @@ export const getAllJobs: AuthenticatedHandler = async (req, res, next) => {
         ],
       }),
       jobService.countJobs(queryFilters),
+      Job.aggregate([
+        { $match: queryFilters },
+        {
+          $group: {
+            _id: null,
+            totalVacancies: { $sum: { $ifNull: ["$vacancies", 0] } },
+          },
+        },
+      ]),
     ]);
+
+    const totalVacancies = totalVacanciesAgg[0]?.totalVacancies || 0;
 
     return res.status(200).json({
       success: true,
@@ -1189,6 +1298,7 @@ export const getAllJobs: AuthenticatedHandler = async (req, res, next) => {
         page: pageNum,
         limit: limitNum,
         totalPages: Math.ceil(total / limitNum),
+        totalVacancies,
       },
     });
   } catch (error) {

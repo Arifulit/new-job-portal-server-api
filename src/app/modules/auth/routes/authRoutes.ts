@@ -14,10 +14,11 @@ import {
 	forgotPassword,
 	resetPassword,
 } from "../controllers";
+import { imageUpload } from "../../../../app/middleware/upload";
 
 const router = Router();
 
-router.post("/register", register);
+router.post("/register", imageUpload.single('companyLogo'), register);
 router.post("/login", login);
 router.get("/google/debug", googleDebug);
 

@@ -40,7 +40,7 @@ export const env = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   GOOGLE_CALLBACK_URL:
-    process.env.GOOGLE_CALLBACK_URL || "http://localhost:5000/api/v1/auth/google/callback",
+    process.env.GOOGLE_CALLBACK_URL || "http://localhost:5173/api/v1/auth/google/callback",
 
   // Mailer (SMTP)
   SMTP_HOST: process.env.SMTP_HOST,
