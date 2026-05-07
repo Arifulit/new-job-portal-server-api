@@ -287,6 +287,7 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
 
     // ── File upload via FormData (multer) ──
     const uploadedFile = getUploadedApplicationFile(req);
+    let uploadFailed = false;
     if (uploadedFile) {
       try {
         console.log("📤 Uploading resume to Cloudinary:", uploadedFile.originalname);
@@ -298,7 +299,6 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
           access_mode: "public",       // ✅ public রাখতে হবে
           public_id: `app_resume_${req.user.id}_${Date.now()}`,
           overwrite: true,
-          // ❌ sign_url এখানে দেওয়া যাবে না — public URL চাই
         });
 
         // ✅ Public URL — কখনো expire হবে না
@@ -317,12 +317,10 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
           if (err) console.warn("⚠️ Could not delete temp file:", uploadedFile.path);
         });
       } catch (uploadError: any) {
+        uploadFailed = true;
         console.error("❌ Cloudinary upload failed:", uploadError.message);
-        return res.status(500).json({
-          success: false,
-          message: "Failed to upload resume to cloud storage",
-          error: uploadError.message,
-        });
+        console.warn("Proceeding without uploaded resume; application will be created and candidate can re-upload later.");
+        // don't return 500 here; attempt to proceed using any provided URLs or stored resumes
       }
     } else if (resume || resumeUrl) {
       // Body থেকে URL পাঠালে সরাসরি নাও
@@ -334,12 +332,9 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
       }
     }
 
-    if (!applicationData.resume) {
-      return res.status(400).json({
-        success: false,
-        message: "Resume is required. Please upload resume before applying.",
-      });
-    }
+    // If upload failed and we couldn't resolve any resume URL, allow creating the application
+    // but warn in the response so frontend can prompt candidate to attach resume later.
+    const missingResume = !applicationData.resume;
 
     if (coverLetter) {
       applicationData.coverLetter = coverLetter;
@@ -388,11 +383,19 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
     applicationObj.resume = resumeLinks.sourceUrl;
     applicationObj.downloadUrl = uploadedDownloadUrl || resumeLinks.downloadUrl;
 
-    return res.status(201).json({
+    const responsePayload: any = {
       success: true,
       message: "Application submitted successfully",
       data: applicationObj,
-    });
+    };
+
+    if (typeof uploadFailed !== 'undefined' && uploadFailed) {
+      responsePayload.warning = "Resume upload to cloud storage failed; application created without uploaded resume. Candidate may re-upload resume in profile.";
+    } else if (missingResume) {
+      responsePayload.warning = "No resume was attached or found; application created without resume.";
+    }
+
+    return res.status(201).json(responsePayload);
   } catch (err: any) {
     console.error("Error submitting application:", err);
     const statusCode =
