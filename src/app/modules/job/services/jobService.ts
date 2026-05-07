@@ -522,10 +522,14 @@ export const countJobs = async (
 ): Promise<number> => {
   try {
     const queryFilters = buildJobQueryFilters(filters, company);
-    return await Job.countDocuments(queryFilters);
+    // Add timeout to prevent indefinite hanging on database connection issues
+    return await Job.countDocuments(queryFilters).maxTimeMS(5000);
   } catch (error) {
     console.error('Error in countJobs service:', error);
-    throw new Error(`Failed to count jobs: ${error instanceof Error ? error.message : String(error)}`);
+    // Log detailed error info for debugging
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('❌ countJobs failed:', { errorMsg, filters });
+    throw new Error(`Failed to count jobs: ${errorMsg}`);
   }
 };
 export const deleteJob = async (id: string) => {

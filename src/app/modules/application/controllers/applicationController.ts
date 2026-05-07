@@ -364,12 +364,23 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
 
     const recruiterId = toIdString((targetJob as any).createdBy);
     if (recruiterId && recruiterId !== req.user.id) {
-      await createNotification({
-        userId: recruiterId,
-        type: "Application",
-        message: "A new application has been submitted for one of your jobs.",
-        relatedId: (application as any)._id,
-      });
+      if (Types.ObjectId.isValid(recruiterId)) {
+        try {
+          await createNotification({
+            userId: recruiterId,
+            type: "Application",
+            message: "A new application has been submitted for one of your jobs.",
+            relatedId: (application as any)._id,
+          });
+        } catch (notificationError: any) {
+          console.warn(
+            "⚠️ Failed to create application notification:",
+            notificationError?.message || notificationError,
+          );
+        }
+      } else {
+        console.warn("⚠️ Skipping application notification because recruiter ID is invalid:", recruiterId);
+      }
     }
 
     // ✅ Response-এ clean public URL দাও

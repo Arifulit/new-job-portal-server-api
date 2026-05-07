@@ -1265,7 +1265,7 @@ export const getAllJobs: AuthenticatedHandler = async (req, res, next) => {
       }
     }
 
-    const [jobs, total, totalVacanciesAgg] = await Promise.all([
+    const results = await Promise.allSettled([
       jobService.getJobs({
         filters: queryFilters,
         sort,
@@ -1288,7 +1288,22 @@ export const getAllJobs: AuthenticatedHandler = async (req, res, next) => {
       ]),
     ]);
 
+    // Handle results with fallbacks for failed operations
+    const jobs = results[0].status === 'fulfilled' ? results[0].value : [];
+    let total = results[1].status === 'fulfilled' ? results[1].value : jobs.length;
+    const totalVacanciesAgg = results[2].status === 'fulfilled' ? results[2].value : [];
     const totalVacancies = totalVacanciesAgg[0]?.totalVacancies || 0;
+
+    // Log any failures for monitoring
+    if (results[0].status === 'rejected') {
+      console.warn('⚠️ Failed to fetch jobs list:', results[0].reason?.message);
+    }
+    if (results[1].status === 'rejected') {
+      console.warn('⚠️ Failed to count total jobs (using current list length as fallback):', results[1].reason?.message);
+    }
+    if (results[2].status === 'rejected') {
+      console.warn('⚠️ Failed to aggregate vacancies:', results[2].reason?.message);
+    }
 
     return res.status(200).json({
       success: true,
