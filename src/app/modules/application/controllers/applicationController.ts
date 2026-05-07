@@ -244,6 +244,8 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
       return res.status(401).json({ success: false, message: "Authentication required" });
     }
 
+    const userId = req.user.id;
+
     const { job, jobId, resume, resumeUrl, coverLetter } = req.body;
     const jobToApply = jobId || job;
 
@@ -270,7 +272,7 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    if (toIdString((targetJob as any).createdBy) === req.user.id) {
+    if (toIdString((targetJob as any).createdBy) === userId) {
       return res.status(400).json({
         success: false,
         message: "You cannot apply to your own job",
@@ -279,54 +281,23 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
 
     const applicationData: any = {
       job: jobToApply,
-      candidate: req.user.id,
+      candidate: userId,
       status: "Applied",
     };
 
     let uploadedDownloadUrl: string | undefined;
 
     // ── File upload via FormData (multer) ──
+    // To speed up application submission we create the application first and
+    // perform heavy operations (upload, email, notifications) in background.
     const uploadedFile = getUploadedApplicationFile(req);
+    let pendingUploadedFile: Express.Multer.File | undefined = uploadedFile;
     let uploadFailed = false;
-    if (uploadedFile) {
-      try {
-        console.log("📤 Uploading resume to Cloudinary:", uploadedFile.originalname);
-
-        const cloudResult = await cloudinary.uploader.upload(uploadedFile.path, {
-          folder: "application-resumes",
-          resource_type: "raw",
-          type: "upload",
-          access_mode: "public",       // ✅ public রাখতে হবে
-          public_id: `app_resume_${req.user.id}_${Date.now()}`,
-          overwrite: true,
-        });
-
-        // ✅ Public URL — কখনো expire হবে না
-        const publicViewUrl = createPublicRawUrl(cloudResult.public_id, cloudResult.version, false);
-        uploadedDownloadUrl = createPublicRawUrl(cloudResult.public_id, cloudResult.version, true);
-
-        applicationData.resume = publicViewUrl;
-
-        console.log("✅ Resume uploaded successfully");
-        console.log("📁 Public ID:", cloudResult.public_id);
-        console.log("🔗 View URL:", publicViewUrl);
-        console.log("⬇️  Download URL:", uploadedDownloadUrl);
-
-        // Temp file মুছে ফেলো
-        fs.unlink(uploadedFile.path, (err) => {
-          if (err) console.warn("⚠️ Could not delete temp file:", uploadedFile.path);
-        });
-      } catch (uploadError: any) {
-        uploadFailed = true;
-        console.error("❌ Cloudinary upload failed:", uploadError.message);
-        console.warn("Proceeding without uploaded resume; application will be created and candidate can re-upload later.");
-        // don't return 500 here; attempt to proceed using any provided URLs or stored resumes
-      }
-    } else if (resume || resumeUrl) {
+    if (!pendingUploadedFile && (resume || resumeUrl)) {
       // Body থেকে URL পাঠালে সরাসরি নাও
       applicationData.resume = resume || resumeUrl;
     } else {
-      const storedResumeUrl = await getLatestCandidateResumeUrl(req.user.id);
+      const storedResumeUrl = await getLatestCandidateResumeUrl(userId);
       if (storedResumeUrl) {
         applicationData.resume = storedResumeUrl;
       }
@@ -340,43 +311,77 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
       applicationData.coverLetter = coverLetter;
     }
 
-    // Application save করো
+    // Application save করো — create quickly
     const application = await applicationService.applyJob(applicationData);
     const applicationObj: any = (application as any).toObject ? (application as any).toObject() : application;
 
-    const candidateUser = await User.findById(req.user.id).select("name email").lean();
-    if (candidateUser?.email) {
+    // Kick off background tasks (do not await) to keep API response fast
+    (async () => {
       try {
-        await sendApplicationSubmittedEmail({
-          to: candidateUser.email,
-          candidateName: candidateUser.name,
-          jobTitle: (targetJob as any)?.title,
-        });
-      } catch (mailError: any) {
-        console.warn("Failed to send application confirmation email:", mailError?.message || mailError);
-      }
-    }
+        const candidateUser = await User.findById(userId).select("name email").lean();
 
-    const recruiterId = toIdString((targetJob as any).createdBy);
-    if (recruiterId && recruiterId !== req.user.id) {
-      if (Types.ObjectId.isValid(recruiterId)) {
-        try {
-          await createNotification({
-            userId: recruiterId,
-            type: "Application",
-            message: "A new application has been submitted for one of your jobs.",
-            relatedId: (application as any)._id,
-          });
-        } catch (notificationError: any) {
-          console.warn(
-            "⚠️ Failed to create application notification:",
-            notificationError?.message || notificationError,
-          );
+        // If there is a pending uploaded file, upload it and patch the application
+        if (pendingUploadedFile) {
+          try {
+            console.log("📤 (bg) Uploading resume to Cloudinary:", pendingUploadedFile.originalname);
+            const cloudResult = await cloudinary.uploader.upload(pendingUploadedFile.path, {
+              folder: "application-resumes",
+              resource_type: "raw",
+              type: "upload",
+              access_mode: "public",
+              public_id: `app_resume_${userId}_${Date.now()}`,
+              overwrite: true,
+            });
+
+            const publicViewUrl = createPublicRawUrl(cloudResult.public_id, cloudResult.version, false);
+            const downloadUrl = createPublicRawUrl(cloudResult.public_id, cloudResult.version, true);
+
+            // Update application with the uploaded resume URL
+            await Application.findByIdAndUpdate(application._id, { resume: publicViewUrl }, { new: true });
+            uploadedDownloadUrl = downloadUrl;
+
+            fs.unlink(pendingUploadedFile.path, (err) => {
+              if (err) console.warn("⚠️ Could not delete temp file (bg):", pendingUploadedFile.path);
+            });
+
+            console.log("✅ (bg) Resume uploaded and application updated");
+          } catch (bgUploadError: any) {
+            uploadFailed = true;
+            console.error("❌ (bg) Cloudinary upload failed:", bgUploadError.message);
+          }
         }
-      } else {
-        console.warn("⚠️ Skipping application notification because recruiter ID is invalid:", recruiterId);
+
+        // Send confirmation email (fire-and-forget)
+        if (candidateUser?.email) {
+          try {
+            await sendApplicationSubmittedEmail({
+              to: candidateUser.email,
+              candidateName: candidateUser.name,
+              jobTitle: (targetJob as any)?.title,
+            });
+          } catch (mailError: any) {
+            console.warn("(bg) Failed to send application confirmation email:", mailError?.message || mailError);
+          }
+        }
+
+        // Create notification for recruiter (fire-and-forget)
+        const recruiterId = toIdString((targetJob as any).createdBy);
+        if (recruiterId && recruiterId !== userId && Types.ObjectId.isValid(recruiterId)) {
+          try {
+            await createNotification({
+              userId: recruiterId,
+              type: "Application",
+              message: "A new application has been submitted for one of your jobs.",
+              relatedId: (application as any)._id,
+            });
+          } catch (notificationError: any) {
+            console.warn("(bg) Failed to create application notification:", notificationError?.message || notificationError);
+          }
+        }
+      } catch (bgErr) {
+        console.error("Unexpected error in background application tasks:", bgErr);
       }
-    }
+    })();
 
     // ✅ Response-এ clean public URL দাও
     const resumeLinks = buildResumeLinks(applicationObj?.resume);
