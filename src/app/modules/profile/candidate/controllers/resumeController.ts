@@ -181,15 +181,15 @@ export const uploadResumeController = async (req: Request, res: Response) => {
 
         // Fallback: keep local file and expose via /uploads static route
         try {
-          const fileName = file.filename || (file.path && file.path.split(/[\\/]/).pop()) || Date.now().toString();
+          const extractedFileName = file.filename || (file.path && file.path.split(/[\\/]/).pop()) || Date.now().toString();
           const host = req.get("host");
           const protocol = req.protocol;
-          const localUrl = `${protocol}://${host}/uploads/${fileName}`;
+          const localUrl = `${protocol}://${host}/uploads/${extractedFileName}`;
 
           console.warn("⚠️ Using local uploads fallback:", localUrl);
 
           fileUrl = localUrl;
-          fileName = file.originalname || fileName;
+          fileName = file.originalname || extractedFileName;
 
           // Don't delete the temp file so it can be served from /uploads
         } catch (fallbackErr: any) {
