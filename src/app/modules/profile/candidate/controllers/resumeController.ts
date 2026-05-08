@@ -122,6 +122,7 @@ async function streamResumeFromUrl(
 }
 
 export const uploadResumeController = async (req: Request, res: Response) => {
+  const startTime = Date.now();
   try {
     console.log("🟦 Controller: Uploading resume");
     console.log("🟦 Request user:", req.user?.id);
@@ -137,6 +138,7 @@ export const uploadResumeController = async (req: Request, res: Response) => {
     
     let fileUrl: string;
     let fileName: string;
+    let uploadDuration: number | undefined;
     
     // Check if file was uploaded via form-data (multer)
     const uploadedFile = (req as any).file;
@@ -156,6 +158,7 @@ export const uploadResumeController = async (req: Request, res: Response) => {
       console.log("📤 Uploading to Cloudinary:", file.originalname);
 
       try {
+        const beforeUpload = Date.now();
         const cloudResult = await cloudinary.uploader.upload(file.path, {
           folder: "resumes",
           resource_type: "raw",
@@ -168,6 +171,7 @@ export const uploadResumeController = async (req: Request, res: Response) => {
         const publicViewUrl = createPublicRawUrl(cloudResult.public_id, cloudResult.version, false);
         fileUrl = publicViewUrl;
         fileName = file.originalname || file.filename;
+        uploadDuration = Date.now() - beforeUpload;
 
         console.log("✅ File uploaded to Cloudinary");
         console.log("🔗 Public View URL:", fileUrl);
@@ -181,6 +185,7 @@ export const uploadResumeController = async (req: Request, res: Response) => {
 
         // Fallback: keep local file and expose via /uploads static route
         try {
+          const beforeFallback = Date.now();
           const extractedFileName = file.filename || (file.path && file.path.split(/[\\/]/).pop()) || Date.now().toString();
           const host = req.get("host");
           const protocol = req.protocol;
@@ -190,14 +195,17 @@ export const uploadResumeController = async (req: Request, res: Response) => {
 
           fileUrl = localUrl;
           fileName = file.originalname || extractedFileName;
+          uploadDuration = Date.now() - beforeFallback;
 
           // Don't delete the temp file so it can be served from /uploads
         } catch (fallbackErr: any) {
           console.error("❌ Fallback local save failed:", fallbackErr?.message || fallbackErr);
+          const totalTimeErr = Date.now() - startTime;
           return res.status(500).json({
             success: false,
             message: "Failed to upload file to cloud storage",
             error: uploadError.message,
+            timings: { totalDurationMs: totalTimeErr },
           });
         }
       }
@@ -226,6 +234,7 @@ export const uploadResumeController = async (req: Request, res: Response) => {
       candidate: req.user.id
     };
     
+    const beforeSave = Date.now();
     console.log("💾 Saving resume to database");
     const resume = await resumeService.uploadResume(resumeData);
     const resumeObj: any = (resume as any).toObject ? (resume as any).toObject() : resume;
@@ -234,9 +243,12 @@ export const uploadResumeController = async (req: Request, res: Response) => {
     resumeObj.sourceUrl = resumeLinks.sourceUrl;
     resumeObj.downloadUrl = resumeLinks.downloadUrl;
     
+    const afterSave = Date.now();
+    const totalDuration = Date.now() - startTime;
     console.log("✅ Resume uploaded successfully, ID:", resumeObj._id);
     console.log("🔗 FileUrl:", resumeObj.fileUrl);
     console.log("📥 DownloadUrl:", resumeObj.downloadUrl);
+    console.log(`⏱ timings: uploadDuration=${uploadDuration ?? -1}ms saveDuration=${afterSave - beforeSave}ms total=${totalDuration}ms`);
 
     // Attempt to analyze resume via AI (non-blocking for upload)
     (async () => {
@@ -268,7 +280,12 @@ export const uploadResumeController = async (req: Request, res: Response) => {
     res.status(201).json({ 
       success: true, 
       data: resumeObj,
-      message: "Resume uploaded successfully"
+      message: "Resume uploaded successfully",
+      timings: {
+        uploadDurationMs: uploadDuration ?? null,
+        saveDurationMs: afterSave - beforeSave,
+        totalDurationMs: totalDuration,
+      },
     });
   } catch (error: any) {
     console.error("❌ Controller Error:", error.message);
@@ -290,9 +307,11 @@ export const uploadResumeController = async (req: Request, res: Response) => {
       });
     }
     
+    const errTotal = Date.now() - (typeof startTime !== 'undefined' ? startTime : Date.now());
     return res.status(500).json({ 
       success: false, 
-      message: error.message || "Error uploading resume"
+      message: error.message || "Error uploading resume",
+      timings: { totalDurationMs: errTotal }
     });
   }
 };
