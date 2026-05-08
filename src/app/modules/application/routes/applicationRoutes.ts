@@ -170,6 +170,12 @@ router.post(
   withdrawApplication
 );
 
+router.delete(
+  "/:id",
+  authMiddleware(["candidate"]),
+  withdrawApplication
+);
+
 router.get("/:id/resume/preview", previewApplicationResume);
 router.get("/:id/resume/download", downloadApplicationResume);
 

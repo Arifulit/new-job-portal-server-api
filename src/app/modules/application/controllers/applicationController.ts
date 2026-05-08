@@ -1969,17 +1969,17 @@ export const withdrawApplication = async (req: AuthenticatedRequest, res: Respon
     if (application.candidate._id.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: "Not authorized to withdraw this application",
+        message: "Not authorized to delete this application",
       });
     }
 
-    application.status = "Withdrawn";
-    await application.save();
+    // Hard delete from database
+    await Application.deleteOne({ _id: id });
 
     return res.status(200).json({
       success: true,
-      message: "Application withdrawn successfully",
-      data: application,
+      message: "Application deleted successfully",
+      data: { id },
     });
   } catch (error: any) {
     console.error("Error withdrawing application:", error);

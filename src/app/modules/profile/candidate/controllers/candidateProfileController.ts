@@ -6,6 +6,7 @@ import { Resume } from "../models/Resume";
 import { User } from "../../../auth/models/User";
 import cloudinary from "../../../../config/cloudinary";
 
+
 const parseMaybeJson = (value: unknown): unknown => {
   if (typeof value !== "string") {
     return value;
