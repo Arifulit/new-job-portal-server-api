@@ -69,6 +69,11 @@ app.use(
   })
 );
 
+// Serve uploaded files (fallback when Cloudinary is unavailable)
+import path from "path";
+const uploadsStaticPath = path.join(process.cwd(), "uploads");
+app.use("/uploads", express.static(uploadsStaticPath));
+
 
 // Passport middleware
 app.use(passport.initialize());

@@ -178,11 +178,28 @@ export const uploadResumeController = async (req: Request, res: Response) => {
         });
       } catch (uploadError: any) {
         console.error("❌ Cloudinary upload failed:", uploadError.message);
-        return res.status(500).json({
-          success: false,
-          message: "Failed to upload file to cloud storage",
-          error: uploadError.message
-        });
+
+        // Fallback: keep local file and expose via /uploads static route
+        try {
+          const fileName = file.filename || (file.path && file.path.split(/[\\/]/).pop()) || Date.now().toString();
+          const host = req.get("host");
+          const protocol = req.protocol;
+          const localUrl = `${protocol}://${host}/uploads/${fileName}`;
+
+          console.warn("⚠️ Using local uploads fallback:", localUrl);
+
+          fileUrl = localUrl;
+          fileName = file.originalname || fileName;
+
+          // Don't delete the temp file so it can be served from /uploads
+        } catch (fallbackErr: any) {
+          console.error("❌ Fallback local save failed:", fallbackErr?.message || fallbackErr);
+          return res.status(500).json({
+            success: false,
+            message: "Failed to upload file to cloud storage",
+            error: uploadError.message,
+          });
+        }
       }
     } else {
       // Check for JSON body with fileUrl and fileName
