@@ -306,6 +306,7 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
         uploadedDownloadUrl = createPublicRawUrl(cloudResult.public_id, cloudResult.version, true);
 
         applicationData.resume = publicViewUrl;
+        applicationData.downloadUrl = uploadedDownloadUrl;
 
         console.log("✅ Resume uploaded successfully");
         console.log("📁 Public ID:", cloudResult.public_id);
@@ -330,6 +331,12 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
       if (storedResumeUrl) {
         applicationData.resume = storedResumeUrl;
       }
+    }
+
+    if (applicationData.resume && !applicationData.downloadUrl) {
+      const resumeLinks = buildResumeLinks(applicationData.resume);
+      applicationData.resume = resumeLinks.sourceUrl;
+      applicationData.downloadUrl = resumeLinks.downloadUrl;
     }
 
     // If upload failed and we couldn't resolve any resume URL, allow creating the application
@@ -381,7 +388,7 @@ export const applyJob = async (req: AuthenticatedRequest, res: Response) => {
     // ✅ Response-এ clean public URL দাও
     const resumeLinks = buildResumeLinks(applicationObj?.resume);
     applicationObj.resume = resumeLinks.sourceUrl;
-    applicationObj.downloadUrl = uploadedDownloadUrl || resumeLinks.downloadUrl;
+    applicationObj.downloadUrl = applicationObj.downloadUrl || uploadedDownloadUrl || resumeLinks.downloadUrl;
 
     const responsePayload: any = {
       success: true,

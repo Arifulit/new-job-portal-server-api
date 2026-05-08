@@ -9,6 +9,7 @@ export const applyJob = async (data: IApplication) => {
     if (existing.status === "Withdrawn") {
       existing.status = "Applied";
       existing.resume = data.resume ?? existing.resume;
+      existing.downloadUrl = data.downloadUrl ?? existing.downloadUrl;
       existing.coverLetter = data.coverLetter ?? existing.coverLetter;
       await existing.save();
       return existing;

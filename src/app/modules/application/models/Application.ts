@@ -7,6 +7,7 @@ export interface IApplication {
   status: "Applied" | "Reviewed" | "Shortlisted" | "Interview" | "Rejected" | "Accepted" | "Withdrawn";
   interviewScheduledAt?: string;
   resume?: string;
+  downloadUrl?: string;
   coverLetter?: string;
 }
 
@@ -20,6 +21,7 @@ const applicationSchema = new Schema<IApplication>({
   },
   interviewScheduledAt: { type: String },
   resume: { type: String },
+  downloadUrl: { type: String },
   coverLetter: { type: String },
 }, { timestamps: true });
 
